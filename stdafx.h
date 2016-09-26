@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <shellapi.h>
 #include <process.h>
+#include <Uxtheme.h>
 #include <iostream>
 #include <sstream>
 #include <vector>

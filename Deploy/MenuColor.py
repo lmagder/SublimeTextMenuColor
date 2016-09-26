@@ -54,6 +54,15 @@ class DebugCommand(sublime_plugin.ApplicationCommand):
     def run(self):
         print("Called {0}".format(DLLInstance.findTopLevelWindows()))
 
+class DetectNewWindowCommand(sublime_plugin.WindowCommand):
+    def run(self):
+        pass
+    def __init__(self, *args, **kwargs):
+        super(DetectNewWindowCommand, self).__init__(*args, **kwargs)
+        print("new window")
+        if DLLInstance:
+            DLLInstance.findTopLevelWindows()
+
 def plugin_loaded():
     global DLLInstance
     DLLInstance = DLLInterface()

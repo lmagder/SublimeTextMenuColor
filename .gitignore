@@ -47,3 +47,9 @@ Temporary Items
 .apdisk
 *.db
 *.opendb
+Debug
+Release
+x64
+.vs
+Deploy/*.dll
+ipch
