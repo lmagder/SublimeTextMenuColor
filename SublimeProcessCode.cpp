@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "SublimeTextMenuColor.h"
+#include "ThemeDef.h"
 
 static HANDLE g_pipeHandle = 0;
 
@@ -9,7 +10,7 @@ void PipePrintFunc(const wchar_t* strPtr)
 	size_t strLen = wcslen(strPtr) + 1; //include null
 	size_t requiredSize = strLen * sizeof(wchar_t) + sizeof(PipeCommand);
 
-	if (tempBuffer.size() < requiredSize)
+	while (tempBuffer.size() < requiredSize)
 	{
 		tempBuffer.resize(tempBuffer.size() * 2);
 	}
@@ -25,6 +26,7 @@ CRITICAL_SECTION hookedWindowsCS;
 std::unordered_map<HWND, WNDPROC> hookedWindows;
 HBRUSH debugBrush = 0;
 HBRUSH debugBrush2 = 0;
+std::unique_ptr<ThemeDef> g_themeDef;
 
 static void ApplyMenuChanges(HMENU menu, bool setOwnerDraw);
 
@@ -71,14 +73,25 @@ LRESULT CALLBACK WindowProcFunc(
 		LPDRAWITEMSTRUCT diStruct = (LPDRAWITEMSTRUCT)lParam;
 		if (diStruct->CtlType == ODT_MENU)
 		{
-			FillRect(diStruct->hDC, &diStruct->rcItem, debugBrush2);
-			WCHAR temp[1024];
-			GetMenuStringW(GetMenu(hwnd), diStruct->itemID, temp, 1024, MF_BYCOMMAND);
-			SetBkMode(diStruct->hDC, TRANSPARENT);
-			DrawTextW(diStruct->hDC, temp, (int)wcslen(temp), &diStruct->rcItem, DT_LEFT);
-			OutputDebugStringW(temp);
-			OutputDebugStringW(L"\n");
-			return TRUE;
+			BOOL ret = FALSE;
+			EnterCriticalSection(&hookedWindowsCS);
+			if (g_themeDef)
+			{
+				g_themeDef->DrawItem(hwnd, diStruct);
+				ret = true;
+			}
+			LeaveCriticalSection(&hookedWindowsCS);
+			//FillRect(diStruct->hDC, &diStruct->rcItem, debugBrush2);
+			//WCHAR temp[1024];
+			//GetMenuStringW(GetMenu(hwnd), diStruct->itemID, temp, 1024, MF_BYCOMMAND);
+			//SetBkMode(diStruct->hDC, TRANSPARENT);
+			//DrawTextW(diStruct->hDC, temp, (int)wcslen(temp), &diStruct->rcItem, DT_LEFT);
+			//OutputDebugStringW(temp);
+			//OutputDebugStringW(L"\n");
+			if (ret)
+			{
+				return TRUE;
+			}
 		}
 	}
 	else if (uMsg == WM_MEASUREITEM)
@@ -86,15 +99,26 @@ LRESULT CALLBACK WindowProcFunc(
 		LPMEASUREITEMSTRUCT miStruct = (LPMEASUREITEMSTRUCT)lParam;
 		if (miStruct->CtlType == ODT_MENU)
 		{
-			WCHAR temp[1024];
-			GetMenuStringW(GetMenu(hwnd), miStruct->itemID, temp, 1024, MF_BYCOMMAND);
-			HDC dc = GetDC(hwnd);
-			SIZE sz;
-			GetTextExtentPoint32(dc, temp, (int)wcslen(temp), &sz);
-			miStruct->itemWidth = sz.cx;
-			miStruct->itemHeight = sz.cy;
-			ReleaseDC(hwnd, dc);
-			return TRUE;
+			BOOL ret = FALSE;
+			EnterCriticalSection(&hookedWindowsCS);
+			if (g_themeDef)
+			{
+				g_themeDef->MeasureItem(hwnd, miStruct);
+				ret = true;
+			}
+			LeaveCriticalSection(&hookedWindowsCS);
+			//WCHAR temp[1024];
+			//GetMenuStringW(GetMenu(hwnd), miStruct->itemID, temp, 1024, MF_BYCOMMAND);
+			//HDC dc = GetDC(hwnd);
+			//SIZE sz;
+			//GetTextExtentPoint32(dc, temp, (int)wcslen(temp), &sz);
+			//miStruct->itemWidth = sz.cx;
+			//miStruct->itemHeight = sz.cy;
+			//ReleaseDC(hwnd, dc);
+			if (ret)
+			{
+				return TRUE;
+			}
 		}
 	}
 	return CallBaseProc(hwnd, uMsg, wParam, lParam);
@@ -217,7 +241,7 @@ void MainThreadInSublimeProcess(void* voidArgs)
 	debugBrush2 = CreateSolidBrush(RGB(0, 255, 0));
 
 	std::wstring pipeName = GetPipeName(GetCurrentProcessId());
-	g_pipeHandle = CreateNamedPipeW(pipeName.c_str(), PIPE_ACCESS_DUPLEX, PIPE_TYPE_MESSAGE | PIPE_WAIT, 1, 0, 0, 500, nullptr);
+	g_pipeHandle = CreateNamedPipeW(pipeName.c_str(), PIPE_ACCESS_DUPLEX, PIPE_TYPE_MESSAGE | PIPE_WAIT | PIPE_READMODE_MESSAGE, 1, 10 * 1024*1024, 10 * 1024 * 1024, 500, nullptr);
 	if (!g_pipeHandle)
 	{
 		FreeLibraryAndExitThread(localArgs.myModule, 0);
@@ -227,21 +251,26 @@ void MainThreadInSublimeProcess(void* voidArgs)
 	g_PrintFunc = &PipePrintFunc;
 
 	std::vector<uint8_t> tempBuffer(1024, 0);
+	DWORD totalRead = 0;
 	while (true)
 	{
 		DWORD bytesRead = 0;
-		BOOL ret = ReadFile(g_pipeHandle, tempBuffer.data(), (DWORD)tempBuffer.size(), &bytesRead, nullptr);
+		BOOL ret = ReadFile(g_pipeHandle, tempBuffer.data() + totalRead, (DWORD)tempBuffer.size() - totalRead, &bytesRead, nullptr);
 		if (!ret)
 		{
 			if (GetLastError() == ERROR_MORE_DATA)
 			{
 				tempBuffer.resize(tempBuffer.size() * 2);
+				totalRead += bytesRead;
+				continue;
 			}
 			else
 			{
 				break;
 			}
 		}
+
+		totalRead = 0;
 
 		PipeCommand command = *((PipeCommand*)tempBuffer.data());
 		if (command == PipeCommand::QUIT)
@@ -256,6 +285,18 @@ void MainThreadInSublimeProcess(void* voidArgs)
 		{
 			HandleFindNewWindows();
 		}
+		else if (command == PipeCommand::THEME_UPDATE)
+		{
+			EnterCriticalSection(&hookedWindowsCS);
+			g_themeDef = std::make_unique<ThemeDef>((const wchar_t*)(tempBuffer.data() + sizeof(PipeCommand)));
+			auto hookedWindowCopy = hookedWindows;
+			LeaveCriticalSection(&hookedWindowsCS);
+
+			for (auto it : hookedWindowCopy)
+			{
+				DrawMenuBar(it.first);
+			}
+		}
 	}
 	UnhookAllWindows();
 	g_PrintFunc = &DefaultPrintFunc;
@@ -267,6 +308,7 @@ void MainThreadInSublimeProcess(void* voidArgs)
 	DeleteObject(debugBrush);
 	DeleteObject(debugBrush2);
 	//There is an extra handle
+	FreeLibrary(localArgs.myModule);
 	FreeLibrary(localArgs.myModule);
 	FreeLibraryAndExitThread(localArgs.myModule, 0);
 }

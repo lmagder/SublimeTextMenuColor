@@ -21,8 +21,11 @@
     <ClInclude Include="targetver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ThemeDef.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="SublimeTextMenuColor.h">
-      <Filter>Source Files</Filter>
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -36,6 +39,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="PluginHostCode.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ThemeDef.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

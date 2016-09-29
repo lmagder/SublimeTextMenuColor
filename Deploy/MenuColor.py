@@ -28,7 +28,7 @@ class DLLInterface(object):
         self.printCallback = printCallbackProto(print)
         self.setPrintCallback(self.printCallback)
 
-        findTopLevelWindowsProto = ctypes.CFUNCTYPE(ctypes.c_int32)
+        findTopLevelWindowsProto = ctypes.CFUNCTYPE(ctypes.c_bool)
         self.findTopLevelWindows = findTopLevelWindowsProto(("FindTopLevelWindows", self.DLLObject),())
 
         loadIntoMainProcessProto = ctypes.CFUNCTYPE(ctypes.c_bool)
@@ -37,10 +37,14 @@ class DLLInterface(object):
         unloadFromMainProcessProto = ctypes.CFUNCTYPE(ctypes.c_bool)
         self.unloadFromMainProcess = unloadFromMainProcessProto(("UnloadFromMainProcess", self.DLLObject),())
 
+        updateThemeProto = ctypes.CFUNCTYPE(ctypes.c_bool, ctypes.c_wchar_p)
+        self.updateTheme = updateThemeProto(("UpdateTheme", self.DLLObject))
+
     def __del__(self):
         print("Unloading")
         del self.setPrintCallback
         del self.findTopLevelWindows
+        del self.updateTheme
         del self.loadIntoMainProcess
         del self.unloadFromMainProcess
         del self.DLLObject
@@ -50,9 +54,21 @@ class DLLInterface(object):
 
 DLLInstance = None
 
+def refreshTheme():
+    global DLLInstance
+    themeName = sublime.load_settings('Preferences.sublime-settings').get('theme', 'Default.sublime-theme').lower()
+    for themeResource in sublime.find_resources('*.sublime-theme'):
+        filename = os.path.basename(themeResource)
+        if filename.lower() == themeName:
+            themeData = sublime.load_resource(themeResource)
+            DLLInstance.updateTheme(themeData)
+            break
+
+
 class DebugCommand(sublime_plugin.ApplicationCommand):
     def run(self):
-        print("Called {0}".format(DLLInstance.findTopLevelWindows()))
+        DLLInstance.findTopLevelWindows()
+        refreshTheme()
 
 class DetectNewWindowCommand(sublime_plugin.WindowCommand):
     def run(self):
@@ -60,7 +76,7 @@ class DetectNewWindowCommand(sublime_plugin.WindowCommand):
     def __init__(self, *args, **kwargs):
         super(DetectNewWindowCommand, self).__init__(*args, **kwargs)
         print("new window")
-        if DLLInstance:
+        if DLLInstance is not None:
             DLLInstance.findTopLevelWindows()
 
 def plugin_loaded():
@@ -69,11 +85,13 @@ def plugin_loaded():
     if not DLLInstance.loadIntoMainProcess():
         raise Exception("loadIntoMainProcess failed")
     DLLInstance.findTopLevelWindows()
+    refreshTheme()
 
 def plugin_unloaded():
     global DLLInstance
-    if not DLLInstance.unloadFromMainProcess():
-        raise Exception("unloadFromMainProcess failed")
+    if DLLInstance is not None:
+        if not DLLInstance.unloadFromMainProcess():
+            raise Exception("unloadFromMainProcess failed")
 
     print("Unloaded")
     del DLLInstance
