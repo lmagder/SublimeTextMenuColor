@@ -1,19 +1,26 @@
 #include "stdafx.h"
 #include "SublimeTextMenuColor.h"
 
-PYTHON_CALLABLE void SetPrintCallback(PrintFunc func)
+typedef bool(*QueryBoolSettingFunc)(const wchar_t* strPtr);
+typedef void(*QueryBinaryResourceFunc)(const wchar_t* strPtr, void** buffPointer, size_t* bufSize);
+
+QueryBoolSettingFunc g_queryBoolSettingsFunc = nullptr;
+QueryBinaryResourceFunc g_queryBinaryResourceFunc = nullptr;
+
+PYTHON_CALLABLE void SetCallbacks(PrintFunc func, QueryBoolSettingFunc settingFunc, QueryBinaryResourceFunc resourceFunc)
 {
 	g_PrintFunc = func ? func : &DefaultPrintFunc;
+  g_queryBoolSettingsFunc = settingFunc;
+  g_queryBinaryResourceFunc = resourceFunc;
 }
 
 HANDLE g_sublimeProcess = INVALID_HANDLE_VALUE;
 HANDLE g_sublimePipe = 0;
 
-void PipeWriteString(PipeCommand cmd, const wchar_t* strPtr)
+void PipeWrite(PipeCommand cmd, const void* strPtr, size_t strLen)
 {
 	static std::vector<uint8_t> tempBuffer(1024, 0);
-	size_t strLen = wcslen(strPtr) + 1; //include null
-	size_t requiredSize = strLen * sizeof(wchar_t) + sizeof(PipeCommand);
+	size_t requiredSize = strLen + sizeof(PipeCommand);
 
 	while (tempBuffer.size() < requiredSize)
 	{
@@ -22,10 +29,82 @@ void PipeWriteString(PipeCommand cmd, const wchar_t* strPtr)
 
 	uint8_t* pointer = tempBuffer.data();
 	*((PipeCommand*)pointer) = cmd;
-	memcpy(pointer + sizeof(PipeCommand), strPtr, strLen * sizeof(wchar_t));
+  if (strLen > 0)
+	  memcpy(pointer + sizeof(PipeCommand), strPtr, strLen);
+
 	DWORD bytesWritten = 0;
 	WriteFile(g_sublimePipe, pointer, (DWORD)requiredSize, &bytesWritten, nullptr);
 }
+
+void PipeWriteString(PipeCommand cmd, const wchar_t* strPtr)
+{
+  PipeWrite(cmd, strPtr, (wcslen(strPtr) + 1) * sizeof(wchar_t));
+}
+
+void PollForInput(void* param)
+{
+  if (g_sublimeProcess == INVALID_HANDLE_VALUE)
+  {
+    g_PrintFunc(L"Not loaded");
+    return;
+  }
+
+  std::vector<uint8_t> tempBuffer(1024, 0);
+  DWORD totalRead = 0;
+  while (true)
+  {
+    DWORD bytesRead = 0;
+    BOOL ret = ReadFile(g_sublimePipe, tempBuffer.data() + totalRead, (DWORD)tempBuffer.size() - totalRead, &bytesRead, nullptr);
+    if (!ret)
+    {
+      if (GetLastError() == ERROR_MORE_DATA)
+      {
+        tempBuffer.resize(tempBuffer.size() * 2);
+        totalRead += bytesRead;
+        continue;
+      }
+      else
+      {
+        break;
+      }
+    }
+
+    totalRead = 0;
+
+    PipeCommand command = *((PipeCommand*)tempBuffer.data());
+    if (command == PipeCommand::QUIT)
+    {
+      break;
+    }
+    else if (command == PipeCommand::PRINT)
+    {
+      g_PrintFunc((const wchar_t*)(tempBuffer.data() + sizeof(PipeCommand)));
+    }
+    else if (command == PipeCommand::REQUEST_BOOL_SETTING)
+    {
+      auto settingName = (const wchar_t*)(tempBuffer.data() + sizeof(PipeCommand));
+      uint8_t result = g_queryBoolSettingsFunc ? (g_queryBoolSettingsFunc(settingName) ? 1 : 0) : 0;
+      PipeWrite(PipeCommand::BOOL_SETTING, &result, 1);
+    }
+    else if (command == PipeCommand::REQUEST_BINARY_RESOURCE)
+    {
+      auto resName = (const wchar_t*)(tempBuffer.data() + sizeof(PipeCommand));
+      void* buffer = nullptr;
+      size_t bufferSize = 0;
+      if (g_queryBinaryResourceFunc)
+      {
+        g_queryBinaryResourceFunc(resName, &buffer, &bufferSize);
+      }
+      PipeWrite(PipeCommand::BINARY_RESOURCE, buffer, bufferSize);
+      if (buffer)
+      {
+        HeapFree(GetProcessHeap(), 0, buffer);
+      }
+    }
+  }
+}
+
+HANDLE g_threadHandle = INVALID_HANDLE_VALUE;
 
 PYTHON_CALLABLE bool LoadIntoMainProcess()
 {
@@ -98,7 +177,7 @@ PYTHON_CALLABLE bool LoadIntoMainProcess()
 		Sleep(250);
 	}
 
-	g_sublimePipe = CreateFileW(pipeName.c_str(), GENERIC_WRITE | GENERIC_READ, 0, nullptr, OPEN_EXISTING, 0, 0);
+	g_sublimePipe = CreateFileW(pipeName.c_str(), GENERIC_WRITE | GENERIC_READ, 0, nullptr, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, 0);
 	if (!remoteThread)
 	{
 		g_PrintFuncF(L"Can't CreateFileW pipe %s in process %i", pipeName.c_str(), sublimeProcessID);
@@ -112,6 +191,7 @@ PYTHON_CALLABLE bool LoadIntoMainProcess()
 		NULL,     // don't set maximum bytes 
 		NULL);    // don't set maximum time 
 
+  g_threadHandle = (HANDLE)_beginthread(&PollForInput, 0, nullptr);
 	//PipeWriteString(PipeCommand::PRINT, L"We are in!");
 
 	return true;
@@ -132,6 +212,10 @@ PYTHON_CALLABLE bool UnloadFromMainProcess()
 	CloseHandle(g_sublimePipe);
 	CloseHandle(g_sublimeProcess);
 	g_sublimeProcess = INVALID_HANDLE_VALUE;
+
+  WaitForSingleObject(g_threadHandle, INFINITE);
+  g_threadHandle = INVALID_HANDLE_VALUE;
+
 	return true;
 }
 

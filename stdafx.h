@@ -8,7 +8,6 @@
 #include "targetver.h"
 
 #define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
-#define NOMINMAX
 // Windows Header Files:
 #include <windows.h>
 #include <stdint.h>
@@ -21,6 +20,23 @@
 #include <string>
 #include <unordered_map>
 #include <memory>
+#include <set>
+#include <algorithm>
+#include <array>
+#include <thread>
+#include <mutex>
+#include <deque>
+#include <objidl.h>
+#include <gdiplus.h>
+#include <Shlwapi.h>
+#include <atlbase.h>
+
+#undef min
+#undef max
+#define RAPIDJSON_HAS_STDSTRING 1
+#include "rapidjson/document.h"
+#include "rapidjson/prettywriter.h"
+
 
 #define PYTHON_CALLABLE extern "C" __declspec(dllexport)
 // TODO: reference additional headers your program requires here
