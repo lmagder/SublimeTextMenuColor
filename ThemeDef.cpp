@@ -732,10 +732,8 @@ void ThemeDef::DrawItem(HWND hwnd, const LPDRAWITEMSTRUCT diStruct)
 
   if (isRootMenu)
   {
-    textOrigin.X = diStruct->rcItem.left;
-    textOrigin.Y = diStruct->rcItem.top;
-    textEnd.X = diStruct->rcItem.right;
-    textEnd.Y = diStruct->rcItem.bottom;
+    textOrigin = Gdiplus::PointF((float)diStruct->rcItem.left, (float)diStruct->rcItem.top);
+    textEnd = Gdiplus::PointF((float)diStruct->rcItem.right, (float)diStruct->rcItem.bottom);
   }
 
   Gdiplus::RectF textRect(textOrigin, Gdiplus::SizeF(textEnd.X - textOrigin.X, textEnd.Y - textOrigin.Y));
@@ -771,7 +769,7 @@ void ThemeDef::DrawItem(HWND hwnd, const LPDRAWITEMSTRUCT diStruct)
 void ThemeDef::MeasureItem(HWND hwnd, LPMEASUREITEMSTRUCT miStruct)
 {
   HMENU menu = GetMenu(hwnd);
-  HDC dc = GetDC(hwnd);
+  HDC dc = GetWindowDC(hwnd);
   {
     Gdiplus::Graphics graphics(dc);
 
