@@ -135,6 +135,8 @@ PYTHON_CALLABLE bool LoadIntoMainProcess()
     RPC_BINDING_HANDLE clientHandle;
     if (RpcBindingFromStringBindingW((RPC_WSTR)stringBindingStr.c_str(), &clientHandle) == RPC_S_OK)
     {
+      RpcBindingSetOption(clientHandle, RPC_C_OPT_BINDING_NONCAUSAL, FALSE);
+      RpcBindingSetOption(clientHandle, RPC_C_OPT_DONT_LINGER, TRUE);
       bindingHandle = clientHandle;
       return true;
     }
@@ -150,7 +152,14 @@ PYTHON_CALLABLE bool UnloadFromMainProcess()
 		g_PrintFunc(L"Not loaded");
 		return false;
 	}
-  std::thread wrappedUpdate([]
+
+  SetCallbacks(nullptr, nullptr, nullptr);
+
+  HMODULE moduleHandle;
+  GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, (LPCWSTR)&UnloadFromMainProcess, &moduleHandle);
+  
+
+  std::thread wrappedUpdate([moduleHandle]
   {
     while (true)
     {
@@ -168,6 +177,8 @@ PYTHON_CALLABLE bool UnloadFromMainProcess()
     }
 
     RpcBindingFree(&bindingHandle);
+    FreeLibrary(moduleHandle);
+    FreeLibraryAndExitThread(moduleHandle, 0);
   });
   wrappedUpdate.detach();
 

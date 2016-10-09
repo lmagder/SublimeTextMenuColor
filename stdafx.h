@@ -44,4 +44,8 @@
 
 #define PYTHON_CALLABLE extern "C" __declspec(dllexport)
 
-#include "RPCInterface_h.h"
+#ifdef _WIN64
+#include "RPCInterface_x64_h.h"
+#else
+#include "RPCInterface_Win32_h.h"
+#endif

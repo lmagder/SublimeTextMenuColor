@@ -56,3 +56,9 @@ ipch
 /RPCInterface_s.c
 /RPCInterface_h.h
 /RPCInterface_c.c
+/RPCInterface_x64_s.c
+/RPCInterface_x64_h.h
+/RPCInterface_x64_c.c
+/RPCInterface_Win32_s.c
+/RPCInterface_Win32_h.h
+/RPCInterface_Win32_c.c

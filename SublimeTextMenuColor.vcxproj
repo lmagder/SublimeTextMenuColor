@@ -209,6 +209,26 @@
       <ApplicationConfigurationMode Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ApplicationConfigurationMode>
       <ApplicationConfigurationMode Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ApplicationConfigurationMode>
       <ApplicationConfigurationMode Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ApplicationConfigurationMode>
+      <OutputDirectory Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+      </OutputDirectory>
+      <OutputDirectory Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+      </OutputDirectory>
+      <OutputDirectory Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </OutputDirectory>
+      <OutputDirectory Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </OutputDirectory>
+      <HeaderFileName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(Filename)_$(Platform)_h.h</HeaderFileName>
+      <HeaderFileName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(Filename)_$(Platform)_h.h</HeaderFileName>
+      <HeaderFileName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(Filename)_$(Platform)_h.h</HeaderFileName>
+      <HeaderFileName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename)_$(Platform)_h.h</HeaderFileName>
+      <ClientStubFile Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(Filename)_$(Platform)_c.c</ClientStubFile>
+      <ServerStubFile Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(Filename)_$(Platform)_s.c</ServerStubFile>
+      <ClientStubFile Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(Filename)_$(Platform)_c.c</ClientStubFile>
+      <ServerStubFile Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(Filename)_$(Platform)_s.c</ServerStubFile>
+      <ClientStubFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(Filename)_$(Platform)_c.c</ClientStubFile>
+      <ServerStubFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(Filename)_$(Platform)_s.c</ServerStubFile>
+      <ClientStubFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename)_$(Platform)_c.c</ClientStubFile>
+      <ServerStubFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename)_$(Platform)_s.c</ServerStubFile>
     </Midl>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

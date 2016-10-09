@@ -286,7 +286,7 @@ static void UnhookAllWindows()
 
 void Impl_SublimeProcess_Unload(/* [in] */ handle_t IDL_handle)
 {
-  RpcMgmtStopServerListening(IDL_handle);
+  RpcMgmtStopServerListening(nullptr);
 }
 
 void Impl_SublimeProcess_FindNewWindows(/* [in] */ handle_t IDL_handle)
@@ -320,7 +320,7 @@ void MainThreadInSublimeProcess(void* voidArgs)
 	std::wstring pipeName = GetPipeName(GetCurrentProcessId());
 
   RPC_STATUS status = RpcServerUseProtseqEpW(L"ncacn_np", 1, (RPC_WSTR)pipeName.c_str(), nullptr);
-  if (status != RPC_S_OK)
+  if (status != RPC_S_OK && status != RPC_S_DUPLICATE_ENDPOINT)
   {
     FreeLibraryAndExitThread(localArgs.myModule, 0);
   }
