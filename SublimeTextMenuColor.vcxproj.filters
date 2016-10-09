@@ -44,5 +44,16 @@
     <ClCompile Include="ThemeDef.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="RPCStubsClient.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="RPCStubsServer.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Midl Include="RPCInterface.idl">
+      <Filter>Source Files</Filter>
+    </Midl>
   </ItemGroup>
 </Project>

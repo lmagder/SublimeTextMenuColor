@@ -35,11 +35,13 @@ class DLLInterface(object):
         self.printCallback = printCallbackProto(print)
         def getSetting(settingName):
             global Settings
+            if Settings is None:
+                return False
             return Settings.get(settingName, False) == True
         self.settingCallback = queryBoolSettingProto(getSetting)
 
         def getResource(resName, outBufferPtr, outBufSize):
-            print("Loading {0}".format(resName))
+            #print("Loading {0}".format(resName))
             resData = None
             try:
                 resData = sublime.load_binary_resource(resName)
@@ -51,7 +53,7 @@ class DLLInterface(object):
                 outBufferPtr[0] = ctypes.c_void_p()
                 outBufSize[0] = ctypes.c_size_t(0)
             else:
-                print("{0} is {1} bytes".format(resName, len(resData)))
+                #print("{0} is {1} bytes".format(resName, len(resData)))
                 ctypes.windll.kernel32.GetProcessHeap.restype = ctypes.c_void_p
                 ctypes.windll.kernel32.HeapAlloc.restype = ctypes.c_void_p
                 tempBuffer = ctypes.windll.kernel32.HeapAlloc(ctypes.c_void_p(ctypes.windll.kernel32.GetProcessHeap()), ctypes.c_ulong(0), ctypes.c_ulong(len(resData)))
@@ -88,29 +90,18 @@ class DLLInterface(object):
         ctypes.windll.kernel32.FreeLibrary(self.DLLHandle)
 
 
-def refreshTheme():
+def refreshTheme(force):
     global DLLInstance
     global Settings
     themeName = Settings.get('theme', 'Default.sublime-theme').lower()
-    if themeName == refreshTheme.prevTheme:
+    if (not force) and themeName == refreshTheme.prevTheme:
         return
     refreshTheme.prevTheme = themeName
     for themeResource in sublime.find_resources('*.sublime-theme'):
         filename = os.path.basename(themeResource)
         if filename.lower() == themeName:
-            defaultThemeData = sublime.load_resource('Packages/Theme - Default/Default.sublime-theme')
             themeData = sublime.load_resource(themeResource)
-            if False:
-                closeArrayIdx = defaultThemeData.rfind(']')
-                defaultThemeData = defaultThemeData[:closeArrayIdx]
-
-                startArrayIdx = themeData.find('[')+1
-                themeData = themeData[startArrayIdx:]
-
-                DLLInstance.updateTheme(defaultThemeData + "\n" + themeData)
-            else:
-                DLLInstance.updateTheme(themeData)
-
+            DLLInstance.updateTheme(themeData)
             break
 
 refreshTheme.prevTheme = None
@@ -119,7 +110,7 @@ class DebugCommand(sublime_plugin.ApplicationCommand):
     def run(self):
         global DLLInstance
         DLLInstance.findTopLevelWindows()
-        refreshTheme()
+        refreshTheme(True)
 
 class DetectNewWindowCommand(sublime_plugin.WindowCommand):
     def run(self):
@@ -139,8 +130,8 @@ def plugin_loaded():
     if not DLLInstance.loadIntoMainProcess():
         raise Exception("loadIntoMainProcess failed")
 
-    refreshTheme()
-    Settings.add_on_change("MenuColor", refreshTheme)
+    refreshTheme(True)
+    Settings.add_on_change("MenuColor", lambda : refreshTheme(True))
     DLLInstance.findTopLevelWindows()
 
 def plugin_unloaded():

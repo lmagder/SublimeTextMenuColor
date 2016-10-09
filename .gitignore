@@ -53,3 +53,6 @@ x64
 .vs
 Deploy/*.dll
 ipch
+/RPCInterface_s.c
+/RPCInterface_h.h
+/RPCInterface_c.c

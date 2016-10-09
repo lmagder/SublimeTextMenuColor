@@ -1,0 +1,14 @@
+import "oaidl.idl";
+import "ocidl.idl";
+
+[uuid(8FB1A791-1C25-4C91-A059-839E39F2D47E)]
+interface SublimeProcess
+{
+  void SublimeProcess_Unload();
+  void SublimeProcess_FindNewWindows();
+  void SublimeProcess_UpdateTheme([in, string] const wchar_t* str);
+
+  [callback] void PluginHost_PrintString([in, string] const wchar_t* str);
+  [callback] boolean PluginHost_GetBoolSetting([in, string] const wchar_t* str, [out] boolean* outValue);
+  [callback] boolean PluginHost_GetBinaryResource([in, string] const wchar_t* str, [out] unsigned int* outDataSize, [out, size_is(, *outDataSize)] char** outData);
+};

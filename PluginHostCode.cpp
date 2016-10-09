@@ -15,96 +15,53 @@ PYTHON_CALLABLE void SetCallbacks(PrintFunc func, QueryBoolSettingFunc settingFu
 }
 
 HANDLE g_sublimeProcess = INVALID_HANDLE_VALUE;
-HANDLE g_sublimePipe = 0;
 
-void PipeWrite(PipeCommand cmd, const void* strPtr, size_t strLen)
+void Impl_PluginHost_PrintString(
+  /* [string][in] */ const wchar_t *str)
 {
-	static std::vector<uint8_t> tempBuffer(1024, 0);
-	size_t requiredSize = strLen + sizeof(PipeCommand);
-
-	while (tempBuffer.size() < requiredSize)
-	{
-		tempBuffer.resize(tempBuffer.size() * 2);
-	}
-
-	uint8_t* pointer = tempBuffer.data();
-	*((PipeCommand*)pointer) = cmd;
-  if (strLen > 0)
-	  memcpy(pointer + sizeof(PipeCommand), strPtr, strLen);
-
-	DWORD bytesWritten = 0;
-	WriteFile(g_sublimePipe, pointer, (DWORD)requiredSize, &bytesWritten, nullptr);
+  OutputDebugStringW(str);
+  OutputDebugStringW(L"\r\n");
+  g_PrintFunc(str);
 }
 
-void PipeWriteString(PipeCommand cmd, const wchar_t* strPtr)
-{
-  PipeWrite(cmd, strPtr, (wcslen(strPtr) + 1) * sizeof(wchar_t));
-}
 
-void PollForInput(void* param)
+boolean Impl_PluginHost_GetBoolSetting(
+  /* [string][in] */ const wchar_t *str,
+  /* [out] */ boolean *outValue)
 {
-  if (g_sublimeProcess == INVALID_HANDLE_VALUE)
+  if (g_queryBoolSettingsFunc)
   {
-    g_PrintFunc(L"Not loaded");
-    return;
+    *outValue = g_queryBoolSettingsFunc(str);
+    return true;
   }
-
-  std::vector<uint8_t> tempBuffer(1024, 0);
-  DWORD totalRead = 0;
-  while (true)
-  {
-    DWORD bytesRead = 0;
-    BOOL ret = ReadFile(g_sublimePipe, tempBuffer.data() + totalRead, (DWORD)tempBuffer.size() - totalRead, &bytesRead, nullptr);
-    if (!ret)
-    {
-      if (GetLastError() == ERROR_MORE_DATA)
-      {
-        tempBuffer.resize(tempBuffer.size() * 2);
-        totalRead += bytesRead;
-        continue;
-      }
-      else
-      {
-        break;
-      }
-    }
-
-    totalRead = 0;
-
-    PipeCommand command = *((PipeCommand*)tempBuffer.data());
-    if (command == PipeCommand::QUIT)
-    {
-      break;
-    }
-    else if (command == PipeCommand::PRINT)
-    {
-      g_PrintFunc((const wchar_t*)(tempBuffer.data() + sizeof(PipeCommand)));
-    }
-    else if (command == PipeCommand::REQUEST_BOOL_SETTING)
-    {
-      auto settingName = (const wchar_t*)(tempBuffer.data() + sizeof(PipeCommand));
-      uint8_t result = g_queryBoolSettingsFunc ? (g_queryBoolSettingsFunc(settingName) ? 1 : 0) : 0;
-      PipeWrite(PipeCommand::BOOL_SETTING, &result, 1);
-    }
-    else if (command == PipeCommand::REQUEST_BINARY_RESOURCE)
-    {
-      auto resName = (const wchar_t*)(tempBuffer.data() + sizeof(PipeCommand));
-      void* buffer = nullptr;
-      size_t bufferSize = 0;
-      if (g_queryBinaryResourceFunc)
-      {
-        g_queryBinaryResourceFunc(resName, &buffer, &bufferSize);
-      }
-      PipeWrite(PipeCommand::BINARY_RESOURCE, buffer, bufferSize);
-      if (buffer)
-      {
-        HeapFree(GetProcessHeap(), 0, buffer);
-      }
-    }
-  }
+  *outValue = false;
+  return false;
 }
 
-HANDLE g_threadHandle = INVALID_HANDLE_VALUE;
+boolean Impl_PluginHost_GetBinaryResource(
+  /* [string][in] */ const wchar_t *str,
+  /* [out] */ unsigned int *outDataSize,
+  /* [out] */ unsigned char **outData)
+{
+  void* buffer = nullptr;
+  size_t bufferSize = 0;
+  if (g_queryBinaryResourceFunc)
+  {
+    g_queryBinaryResourceFunc(str, &buffer, &bufferSize);
+    *outDataSize = (unsigned int)bufferSize;
+    *outData = (unsigned char*)MIDL_user_allocate(bufferSize);
+    if (buffer)
+    {
+      memcpy(*outData, buffer, bufferSize);
+      HeapFree(GetProcessHeap(), 0, buffer);
+    }
+    return true;
+  }
+  *outData = nullptr;
+  return false;
+}
+
+RPC_BINDING_HANDLE bindingHandle = 0;
 
 PYTHON_CALLABLE bool LoadIntoMainProcess()
 {
@@ -168,32 +125,21 @@ PYTHON_CALLABLE bool LoadIntoMainProcess()
 	VirtualFreeEx(g_sublimeProcess, otherProcessBuffer, 0, MEM_RELEASE);
 
 	std::wstring pipeName = GetPipeName(sublimeProcessID);
-	for (int tries = 0; tries < 10; tries++)
-	{
-		if (WaitNamedPipeW(pipeName.c_str(), NMPWAIT_WAIT_FOREVER))
-		{
-			break;
-		}
-		Sleep(250);
-	}
+  wchar_t* stringBinding = nullptr;
+  RPC_STATUS status = RpcStringBindingComposeW(nullptr, L"ncacn_np", nullptr, (RPC_WSTR)pipeName.c_str(), nullptr, &stringBinding);
+  std::wstring stringBindingStr = stringBinding;
+  status = RpcStringFreeW(&stringBinding);
 
-	g_sublimePipe = CreateFileW(pipeName.c_str(), GENERIC_WRITE | GENERIC_READ, 0, nullptr, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, 0);
-	if (!remoteThread)
-	{
-		g_PrintFuncF(L"Can't CreateFileW pipe %s in process %i", pipeName.c_str(), sublimeProcessID);
-		return false;
-	}
-
-	DWORD dwMode = PIPE_READMODE_MESSAGE;
-	SetNamedPipeHandleState(
-		g_sublimePipe,    // pipe handle 
-		&dwMode,  // new pipe mode 
-		NULL,     // don't set maximum bytes 
-		NULL);    // don't set maximum time 
-
-  g_threadHandle = (HANDLE)_beginthread(&PollForInput, 0, nullptr);
-	//PipeWriteString(PipeCommand::PRINT, L"We are in!");
-
+  for (int tryc = 0; tryc < 100; tryc++)
+  {
+    RPC_BINDING_HANDLE clientHandle;
+    if (RpcBindingFromStringBindingW((RPC_WSTR)stringBindingStr.c_str(), &clientHandle) == RPC_S_OK)
+    {
+      bindingHandle = clientHandle;
+      return true;
+    }
+    Sleep(100);
+  }
 	return true;
 }
 
@@ -204,17 +150,30 @@ PYTHON_CALLABLE bool UnloadFromMainProcess()
 		g_PrintFunc(L"Not loaded");
 		return false;
 	}
+  std::thread wrappedUpdate([]
+  {
+    while (true)
+    {
+      RpcTryExcept
+      {
+        SublimeProcess_Unload(bindingHandle);
+      }
+        RpcExcept(1)
+      {
+        if (RpcExceptionCode() == RPC_S_SERVER_TOO_BUSY)
+          continue;
+      }
+      RpcEndExcept
+        break;
+    }
 
-	PipeCommand quit = PipeCommand::QUIT;
-	DWORD written = 0;
-	WriteFile(g_sublimePipe, &quit, sizeof(quit), &written, nullptr);
+    RpcBindingFree(&bindingHandle);
+  });
+  wrappedUpdate.detach();
 
-	CloseHandle(g_sublimePipe);
-	CloseHandle(g_sublimeProcess);
+  CloseHandle(g_sublimeProcess);
 	g_sublimeProcess = INVALID_HANDLE_VALUE;
 
-  WaitForSingleObject(g_threadHandle, INFINITE);
-  g_threadHandle = INVALID_HANDLE_VALUE;
 
 	return true;
 }
@@ -229,22 +188,53 @@ PYTHON_CALLABLE bool FindTopLevelWindows()
 		g_PrintFunc(L"Not loaded");
 		return false;
 	}
-
-	PipeCommand quit = PipeCommand::FIND_NEW_WINDOWS;
-	DWORD written = 0;
-	WriteFile(g_sublimePipe, &quit, sizeof(quit), &written, nullptr);
+  std::thread wrappedUpdate([]
+  {
+    while (true)
+    {
+      RpcTryExcept
+      {
+        SublimeProcess_FindNewWindows(bindingHandle);
+      }
+      RpcExcept(1)
+      {
+        if (RpcExceptionCode() == RPC_S_SERVER_TOO_BUSY)
+          continue;
+      }
+      RpcEndExcept
+      break;
+    }
+  });
+  wrappedUpdate.detach();
 	return true;
 }
 
 PYTHON_CALLABLE bool UpdateTheme(const wchar_t* theme)
 {
-	if (g_sublimeProcess == INVALID_HANDLE_VALUE)
-	{
-		g_PrintFunc(L"Not loaded");
-		return false;
-	}
+  if (g_sublimeProcess == INVALID_HANDLE_VALUE)
+  {
+    g_PrintFunc(L"Not loaded");
+    return false;
+  }
 
-	PipeWriteString(PipeCommand::THEME_UPDATE, theme);
-
+  std::wstring themeStr = theme;
+  std::thread wrappedUpdate([themeStr]
+  {
+    while (true)
+    {
+      RpcTryExcept
+      {
+        SublimeProcess_UpdateTheme(bindingHandle, themeStr.c_str());
+      }
+        RpcExcept(1)
+      {
+        if (RpcExceptionCode() == RPC_S_SERVER_TOO_BUSY)
+          continue;
+      }
+      RpcEndExcept
+      break;
+    }
+  });
+  wrappedUpdate.detach();
 	return true;
 }

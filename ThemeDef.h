@@ -13,7 +13,7 @@ struct ThemeElement
     std::shared_ptr<Gdiplus::Bitmap> texture;
     std::unique_ptr<Gdiplus::Brush> tintBrush;
 
-    Layer() :tint(RGB(255, 255, 255)), opacity(0.0f)
+    Layer() :tint(255, 255, 255), opacity(0.0f), texture(nullptr), tintBrush(nullptr)
     {
       memset(&innerMargins, 0, sizeof(innerMargins));
     }
@@ -51,11 +51,10 @@ struct ThemeElement
 	
 	std::array<Layer,4> layers;
 
-	ThemeElement() : textColor(RGB(255, 255, 255)), shadowColor(0), font(nullptr),
-    fontBold(false), fontItalic(false), fontSize(10.0f)
+	ThemeElement() : textColor(255, 255, 255), shadowColor(0), shadowOffset(0,0)
+    , rowPadding(0,0), fontBold(false), fontItalic(false), fontSize(10.0f)
+    , font(nullptr), textBrush(nullptr), shadowBrush(nullptr)
 	{
-		memset(&shadowOffset, 0, sizeof(shadowOffset));
-    memset(&rowPadding, 0, sizeof(rowPadding));
 		memset(&contentMargins, 0, sizeof(contentMargins));
 	}
 
@@ -105,11 +104,12 @@ class ThemeDef
 		EXPANDABLE = 8,
 		STATE_COUNT = 16
 	};
-	ThemeElement labelState[STATE_COUNT];
-  ThemeElement topLabelState[STATE_COUNT];
+	std::array<ThemeElement, STATE_COUNT> labelState;
+  std::array<ThemeElement, STATE_COUNT> topLabelState;
   std::unordered_map<std::wstring, bool> settingCache;
   std::unordered_map<std::wstring, std::shared_ptr<Gdiplus::Bitmap>> bitmapCache;
   HBRUSH bgBrush;
+  std::unique_ptr<Gdiplus::Brush> bgBrushp;
   bool isValid;
 
 public:
@@ -124,5 +124,6 @@ public:
   std::shared_ptr<Gdiplus::Bitmap> GetBitmap(const wchar_t* imageName);
 
   HBRUSH GetBGBrush();
+  Gdiplus::Brush* GetBGBrushGDIP();
 };
 

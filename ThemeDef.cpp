@@ -206,10 +206,10 @@ namespace
         else
         {
           auto arrayValue = member->value.GetArray();
-          dest.contentMargins.cxRightWidth = arrayValue.Size() > 0 ? arrayValue[0].GetInt() : 0;
-          dest.contentMargins.cxLeftWidth = arrayValue.Size() > 1 ? arrayValue[1].GetInt() : 0;
-          dest.contentMargins.cyTopHeight = arrayValue.Size() > 2 ? arrayValue[2].GetInt() : 0;
-          dest.contentMargins.cyBottomHeight = arrayValue.Size() > 3 ? arrayValue[3].GetInt() : 0;
+          dest.contentMargins.cxRightWidth = arrayValue.Size() > 0 ? (int)arrayValue[0].GetFloat() : 0;
+          dest.contentMargins.cxLeftWidth = arrayValue.Size() > 1 ? (int)arrayValue[1].GetFloat() : 0;
+          dest.contentMargins.cyTopHeight = arrayValue.Size() > 2 ? (int)arrayValue[2].GetFloat() : 0;
+          dest.contentMargins.cyBottomHeight = arrayValue.Size() > 3 ? (int)arrayValue[3].GetFloat() : 0;
         }
     }
 
@@ -254,10 +254,10 @@ namespace
       {
         auto arrayValue = member->value.GetArray();
         int rgb[4] = {
-          arrayValue.Size() > 0 ? arrayValue[0].GetInt() : 0,
-          arrayValue.Size() > 1 ? arrayValue[1].GetInt() : 0,
-          arrayValue.Size() > 2 ? arrayValue[2].GetInt() : 0,
-          arrayValue.Size() > 3 ? arrayValue[3].GetInt() : 255
+          arrayValue.Size() > 0 ? (int)arrayValue[0].GetFloat() : 0,
+          arrayValue.Size() > 1 ? (int)arrayValue[1].GetFloat() : 0,
+          arrayValue.Size() > 2 ? (int)arrayValue[2].GetFloat() : 0,
+          arrayValue.Size() > 3 ? (int)arrayValue[3].GetFloat() : 255
         };
         dest.shadowColor = Gdiplus::Color(rgb[3], rgb[0], rgb[1], rgb[2]);
       }
@@ -274,10 +274,10 @@ namespace
       {
         auto arrayValue = member->value.GetArray();
         int rgb[4] = {
-          arrayValue.Size() > 0 ? arrayValue[0].GetInt() : 0,
-          arrayValue.Size() > 1 ? arrayValue[1].GetInt() : 0,
-          arrayValue.Size() > 2 ? arrayValue[2].GetInt() : 0,
-          arrayValue.Size() > 3 ? arrayValue[3].GetInt() : 255
+          arrayValue.Size() > 0 ? (int)arrayValue[0].GetFloat() : 0,
+          arrayValue.Size() > 1 ? (int)arrayValue[1].GetFloat() : 0,
+          arrayValue.Size() > 2 ? (int)arrayValue[2].GetFloat() : 0,
+          arrayValue.Size() > 3 ? (int)arrayValue[3].GetFloat() : 255
         };
         dest.textColor = Gdiplus::Color(rgb[3], rgb[0], rgb[1], rgb[2]);
       }
@@ -294,10 +294,10 @@ namespace
       {
         auto arrayValue = member->value.GetArray();
         int rgb[4] = {
-          arrayValue.Size() > 0 ? arrayValue[0].GetInt() : 0,
-          arrayValue.Size() > 1 ? arrayValue[1].GetInt() : 0,
-          arrayValue.Size() > 2 ? arrayValue[2].GetInt() : 0,
-          arrayValue.Size() > 3 ? arrayValue[3].GetInt() : 255
+          arrayValue.Size() > 0 ? (int)arrayValue[0].GetFloat() : 0,
+          arrayValue.Size() > 1 ? (int)arrayValue[1].GetFloat() : 0,
+          arrayValue.Size() > 2 ? (int)arrayValue[2].GetFloat() : 0,
+          arrayValue.Size() > 3 ? (int)arrayValue[3].GetFloat() : 255
         };
         dest.textColor = Gdiplus::Color(rgb[3], rgb[0], rgb[1], rgb[2]);
       }
@@ -306,7 +306,7 @@ namespace
     member = themeItemObj.FindMember(L"font.size");
     if (member != themeItemObj.end())
     {
-      if (!member->value.IsFloat())
+      if (!member->value.IsNumber())
       {
         g_PrintFunc(L"Can't understand font.size");
       }
@@ -365,7 +365,7 @@ namespace
         if (member->value.IsString())
         {
           newLayer.texturePath = member->value.GetString();
-          g_PrintFunc(newLayer.texturePath.c_str());
+          //g_PrintFunc(newLayer.texturePath.c_str());
         }
         else if (member->value.IsObject())
         {
@@ -378,7 +378,7 @@ namespace
             if (lastFrameVal.IsString())
             {
               newLayer.texturePath = lastFrameVal.GetString();
-              g_PrintFunc(newLayer.texturePath.c_str());
+              //g_PrintFunc(newLayer.texturePath.c_str());
             }
             else
             {
@@ -407,9 +407,9 @@ namespace
         {
           auto arrayValue = member->value.GetArray();
           int rgb[3] = {
-            arrayValue.Size() > 0 ? arrayValue[0].GetInt() : 0,
-            arrayValue.Size() > 1 ? arrayValue[1].GetInt() : 0,
-            arrayValue.Size() > 2 ? arrayValue[2].GetInt() : 0
+            arrayValue.Size() > 0 ? (int)arrayValue[0].GetFloat() : 0,
+            arrayValue.Size() > 1 ? (int)arrayValue[1].GetFloat() : 0,
+            arrayValue.Size() > 2 ? (int)arrayValue[2].GetFloat() : 0
           };
           newLayer.tint = Gdiplus::Color(255, rgb[0], rgb[1], rgb[2]);
         }
@@ -418,7 +418,7 @@ namespace
       member = themeItemObj.FindMember(LayeredMember(layer, L"opacity"));
       if (member != themeItemObj.end())
       {
-        if (member->value.IsFloat())
+        if (member->value.IsNumber())
         {
           newLayer.opacity = member->value.GetFloat();
         }
@@ -426,7 +426,7 @@ namespace
         {
           //TODO anim
           auto targetAttr = member->value.GetObject().FindMember(L"target");
-          if (targetAttr != member->value.GetObject().end() && targetAttr->value.IsFloat())
+          if (targetAttr != member->value.GetObject().end() && targetAttr->value.IsNumber())
           {
             newLayer.opacity = targetAttr->value.GetFloat();
           }
@@ -452,10 +452,10 @@ namespace
         else
         {
           auto arrayValue = member->value.GetArray();
-          newLayer.innerMargins.cxRightWidth = arrayValue.Size() > 0 ? arrayValue[0].GetInt() : 0;
-          newLayer.innerMargins.cxLeftWidth = arrayValue.Size() > 1 ? arrayValue[1].GetInt() : 0;
-          newLayer.innerMargins.cyTopHeight = arrayValue.Size() > 2 ? arrayValue[2].GetInt() : 0;
-          newLayer.innerMargins.cyBottomHeight = arrayValue.Size() > 3 ? arrayValue[3].GetInt() : 0;
+          newLayer.innerMargins.cxRightWidth = arrayValue.Size() > 0 ? (int)arrayValue[0].GetFloat() : 0;
+          newLayer.innerMargins.cxLeftWidth = arrayValue.Size() > 1 ? (int)arrayValue[1].GetFloat() : 0;
+          newLayer.innerMargins.cyTopHeight = arrayValue.Size() > 2 ? (int)arrayValue[2].GetFloat() : 0;
+          newLayer.innerMargins.cyBottomHeight = arrayValue.Size() > 3 ? (int)arrayValue[3].GetFloat() : 0;
         }
       }
     }
@@ -470,28 +470,49 @@ bool ThemeDef::GetSetting(const wchar_t* setting)
   {
     return findIt->second;
   }
-  bool result = QueryBoolSetting(setting);
+
+  bool result;
+  if (setting[0] == L'!')
+  {
+    result = !QueryBoolSetting(setting + 1);
+  }
+  else
+  {
+    result = QueryBoolSetting(setting);
+  }
+
+  //g_PrintFuncF(L"%s = %s", setting, result ? L"true" : L"false");
+
   settingCache[setting] = result;
   return result;
 }
 
 std::shared_ptr<Gdiplus::Bitmap> ThemeDef::GetBitmap(const wchar_t* imageName)
 {
-  auto findIt = bitmapCache.find(imageName);
+  std::wstring path = L"Packages/";
+  path += imageName;
+
+  auto findIt = bitmapCache.find(path);
   if (findIt != bitmapCache.end())
   {
     return findIt->second;
   }
 
-  std::wstring path = L"Packages/";
-  path += imageName;
-  std::vector<uint8_t> pngData = QueryBinaryResource(path.c_str());
-  CComPtr<IStream> imageData;
-  imageData.Attach(SHCreateMemStream(pngData.data(), (UINT)pngData.size()));
+  unsigned int dataSize = 0;
+  unsigned char* dataPtr = nullptr;
+  if (QueryBinaryResource(path.c_str(), &dataSize, &dataPtr))
+  {
+    CComPtr<IStream> imageData;
+    imageData.Attach(SHCreateMemStream((const BYTE*)dataPtr, dataSize));
+    MIDL_user_free(dataPtr);
 
-  auto texture = std::make_shared<Gdiplus::Bitmap>(imageData);
-  bitmapCache[imageName] = texture;
-  return texture;
+    auto texture = std::make_shared<Gdiplus::Bitmap>(imageData);
+    g_PrintFuncF(L"%s (%u) : %i x %i", imageName, dataSize, texture->GetWidth(), texture->GetHeight());
+    bitmapCache[path] = texture;
+    return texture;
+
+  }
+  return nullptr;
 }
 
 HBRUSH ThemeDef::GetBGBrush()
@@ -504,6 +525,7 @@ HBRUSH ThemeDef::GetBGBrush()
   //  if (l.opacity > 0)
   //  {
   //    bgBrush = CreateSolidBrush(l.tint.ToCOLORREF());
+  //    bgBrushp = std::make_unique<Gdiplus::SolidBrush>(l.tint);
   //    break;
   //  }
   //}
@@ -515,6 +537,7 @@ HBRUSH ThemeDef::GetBGBrush()
       if (l.opacity > 0)
       {
         bgBrush = CreateSolidBrush(l.tint.ToCOLORREF());
+        bgBrushp = std::make_unique<Gdiplus::SolidBrush>(l.tint);
         break;
       }
     }
@@ -523,8 +546,17 @@ HBRUSH ThemeDef::GetBGBrush()
   return bgBrush;
 }
 
+Gdiplus::Brush* ThemeDef::GetBGBrushGDIP()
+{
+  if (!bgBrushp)
+  {
+    GetBGBrush();
+  }
+  return bgBrushp.get();
+}
+
 ThemeDef::ThemeDef(const wchar_t* jsonData)
-  : isValid(false), bgBrush(0)
+  : isValid(false), bgBrush(0), bgBrushp(nullptr)
 {
 	rapidjson::GenericDocument<rapidjson::UTF16<>> doc;
 	rapidjson::ParseResult pr = doc.Parse<rapidjson::kParseCommentsFlag | rapidjson::kParseTrailingCommasFlag>(jsonData);
@@ -645,6 +677,7 @@ ThemeDef::ThemeDef(const wchar_t* jsonData)
     e.fontSize++;
     e.ForceLoad(*this);
   }
+  GetBGBrush();
   isValid = true;
 }
 
@@ -716,7 +749,6 @@ void ThemeDef::DrawItem(HWND hwnd, const LPDRAWITEMSTRUCT diStruct)
   auto& container = isRootMenu ? topContainerElement : containerElement;
 
   container.DrawLayers(graphics, outerRect, false);
- 
  
   state.DrawLayers(graphics, outerRect, false);
   
@@ -884,41 +916,53 @@ void ThemeElement::Layer::ForceLoad(ThemeDef& def)
 void ThemeElement::Layer::DrawLayer(Gdiplus::Graphics& graphics, const Gdiplus::Rect& rect, bool skipImage)
 {
   Gdiplus::Image* layerImage = GetTexture();
-  if (layerImage && !skipImage)
+  if (layerImage)
   {
-    Gdiplus::Point imageDims(layerImage->GetWidth(), layerImage->GetHeight());
-    Gdiplus::Point srcPts[9];
-    Gdiplus::Point srcPtsMax[9];
-
-    int ptsAlongX[4] = { 0, innerMargins.cxLeftWidth, imageDims.X - innerMargins.cxRightWidth, imageDims.X };
-    int ptsAlongY[4] = { 0, innerMargins.cyTopHeight, imageDims.Y - innerMargins.cyBottomHeight, imageDims.Y };
-
-    int destPtsAlongX[4] = { rect.GetLeft(), rect.GetLeft() + innerMargins.cxLeftWidth, rect.GetRight() - innerMargins.cxRightWidth, rect.GetRight() };
-    int destPtsAlongY[4] = { rect.GetTop(), rect.GetTop() + innerMargins.cyTopHeight, rect.GetBottom() - innerMargins.cyBottomHeight, rect.GetBottom() };
-    for (int i = 1; i < 4; i++)
+    if (!skipImage)
     {
-      if (ptsAlongX[i] < ptsAlongX[i - 1])
-        ptsAlongX[i] = ptsAlongX[i - 1];
-      
-      if (ptsAlongY[i] < ptsAlongY[i - 1])
-        ptsAlongY[i] = ptsAlongY[i - 1];
-      
-      if (destPtsAlongX[i] < destPtsAlongX[i - 1])
-        destPtsAlongX[i] = destPtsAlongX[i - 1];
-      
-      if (destPtsAlongY[i] < destPtsAlongY[i - 1])
-        destPtsAlongY[i] = destPtsAlongY[i - 1];
-    }
+      Gdiplus::Point imageDims(layerImage->GetWidth(), layerImage->GetHeight());
+      Gdiplus::Point srcPts[9];
+      Gdiplus::Point srcPtsMax[9];
 
-    for (int x = 0; x < 3; x++)
-    {
-      for (int y = 0; y < 3; y++)
+      int ptsAlongX[4] = { 0, innerMargins.cxLeftWidth, imageDims.X - innerMargins.cxRightWidth, imageDims.X };
+      int ptsAlongY[4] = { 0, innerMargins.cyTopHeight, imageDims.Y - innerMargins.cyBottomHeight, imageDims.Y };
+
+      int destPtsAlongX[4] = { rect.GetLeft(), rect.GetLeft() + innerMargins.cxLeftWidth, rect.GetRight() - innerMargins.cxRightWidth, rect.GetRight() };
+      int destPtsAlongY[4] = { rect.GetTop(), rect.GetTop() + innerMargins.cyTopHeight, rect.GetBottom() - innerMargins.cyBottomHeight, rect.GetBottom() };
+      for (int i = 1; i < 4; i++)
       {
-        Gdiplus::Rect srcRect(ptsAlongX[x], ptsAlongY[y], ptsAlongX[x + 1] - ptsAlongX[x], ptsAlongY[y + 1] - ptsAlongY[y]);
-        Gdiplus::Rect destRect(destPtsAlongX[x], destPtsAlongY[y], destPtsAlongX[x + 1] - destPtsAlongX[x], destPtsAlongY[y + 1] - destPtsAlongY[y]);
-        if (!srcRect.IsEmptyArea())
+        if (ptsAlongX[i] < ptsAlongX[i - 1])
+          ptsAlongX[i] = ptsAlongX[i - 1];
+
+        if (ptsAlongY[i] < ptsAlongY[i - 1])
+          ptsAlongY[i] = ptsAlongY[i - 1];
+
+        if (destPtsAlongX[i] < destPtsAlongX[i - 1])
+          destPtsAlongX[i] = destPtsAlongX[i - 1];
+
+        if (destPtsAlongY[i] < destPtsAlongY[i - 1])
+          destPtsAlongY[i] = destPtsAlongY[i - 1];
+      }
+
+      Gdiplus::ImageAttributes ia;
+      Gdiplus::ColorMatrix colorMatrix =
+      {
+        tint.GetR() / 255.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, tint.GetG() / 255.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, tint.GetB() / 255.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, tint.GetA() / 255.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 0.0f, 1.0f };
+      ia.SetColorMatrix(&colorMatrix);
+      for (int x = 0; x < 3; x++)
+      {
+        for (int y = 0; y < 3; y++)
         {
-          graphics.DrawImage(layerImage, destRect, srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height, Gdiplus::UnitPixel, nullptr, nullptr, nullptr);
+          Gdiplus::Rect srcRect(ptsAlongX[x], ptsAlongY[y], ptsAlongX[x + 1] - ptsAlongX[x], ptsAlongY[y + 1] - ptsAlongY[y]);
+          Gdiplus::Rect destRect(destPtsAlongX[x], destPtsAlongY[y], destPtsAlongX[x + 1] - destPtsAlongX[x], destPtsAlongY[y + 1] - destPtsAlongY[y]);
+          if (!srcRect.IsEmptyArea())
+          {
+            graphics.DrawImage(layerImage, destRect, srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height, Gdiplus::UnitPixel, &ia, nullptr, nullptr);
+          }
         }
       }
     }

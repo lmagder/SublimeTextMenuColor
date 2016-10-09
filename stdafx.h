@@ -8,6 +8,7 @@
 #include "targetver.h"
 
 #define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
+#define RPC_USE_NATIVE_WCHAR
 // Windows Header Files:
 #include <windows.h>
 #include <stdint.h>
@@ -25,11 +26,14 @@
 #include <array>
 #include <thread>
 #include <mutex>
+#include <shared_mutex>
 #include <deque>
+#include <thread>
 #include <objidl.h>
 #include <gdiplus.h>
 #include <Shlwapi.h>
 #include <atlbase.h>
+#include <rpc.h>
 
 #undef min
 #undef max
@@ -39,4 +43,5 @@
 
 
 #define PYTHON_CALLABLE extern "C" __declspec(dllexport)
-// TODO: reference additional headers your program requires here
+
+#include "RPCInterface_h.h"
