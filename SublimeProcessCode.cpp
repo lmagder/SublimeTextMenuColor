@@ -18,12 +18,12 @@ void PipePrintFunc(const wchar_t* strPtr)
   RpcEndExcept
 }
 
-bool QueryBoolSetting(const wchar_t* setting)
+bool QueryBoolSetting(const wchar_t* setting, bool def)
 {
   boolean outVal = false;
   RpcTryExcept
   {
-    if (PluginHost_GetBoolSetting(setting, &outVal))
+    if (PluginHost_GetBoolSetting(setting, def, &outVal))
     {
       return outVal != 0;
     }
@@ -34,6 +34,48 @@ bool QueryBoolSetting(const wchar_t* setting)
   }
   RpcEndExcept
   return false;
+}
+
+static bool WrapPluginHost_GetStringSetting(
+  /* [string][in] */ const wchar_t *str,
+  /* [out] */ unsigned int *outDataSize,
+  /* [size_is][size_is][out] */ unsigned char **outData)
+{
+  RpcTryExcept
+  {
+    if (PluginHost_GetStringSetting(str, outDataSize, outData))
+    {
+      return true;
+    }
+  }
+  RpcExcept(1)
+  {
+
+  }
+  RpcEndExcept
+  *outData = nullptr;
+  *outDataSize = 0;
+  return false;
+}
+
+std::wstring QueryStringSetting(const wchar_t* setting, const std::wstring& def)
+{
+  std::wstring outVal;
+  unsigned int outDataSize = 0;
+  unsigned char* outData = nullptr;
+  if (WrapPluginHost_GetStringSetting(setting, &outDataSize, &outData))
+  {
+    if (outData)
+    {
+      outVal.assign((wchar_t*)outData, (size_t)(outDataSize) / sizeof(wchar_t));
+      MIDL_user_free(outData);
+    }
+  }
+  if (!outData)
+  {
+    outVal = def;
+  }
+  return outVal;
 }
 
 bool QueryBinaryResource(
@@ -117,18 +159,22 @@ LRESULT CALLBACK WindowProcFunc(
       std::lock_guard<std::recursive_mutex> lock(g_themeDefCS);
       if (g_themeDef)
       {
-        MENUBARINFO mbi;
-        mbi.cbSize = sizeof(mbi);
-        GetMenuBarInfo(hwnd, OBJID_MENU, 0, &mbi);
-        HDC hdc = GetWindowDC(hwnd);
+        auto brush = g_themeDef->GetBGBrushGDIP();
+        if (brush)
         {
-          Gdiplus::Graphics graphics(hdc);
-          RECT windowRect;
-          GetWindowRect(hwnd, &windowRect);
-          OffsetRect(&mbi.rcBar, -windowRect.left, -windowRect.top);
-          graphics.FillRectangle(g_themeDef->GetBGBrushGDIP(), mbi.rcBar.left, mbi.rcBar.bottom, mbi.rcBar.right - mbi.rcBar.left, 1);
+          MENUBARINFO mbi;
+          mbi.cbSize = sizeof(mbi);
+          GetMenuBarInfo(hwnd, OBJID_MENU, 0, &mbi);
+          HDC hdc = GetWindowDC(hwnd);
+          {
+            Gdiplus::Graphics graphics(hdc);
+            RECT windowRect;
+            GetWindowRect(hwnd, &windowRect);
+            OffsetRect(&mbi.rcBar, -windowRect.left, -windowRect.top);
+            graphics.FillRectangle(brush, mbi.rcBar.left, mbi.rcBar.bottom, mbi.rcBar.right - mbi.rcBar.left, 1);
+          }
+          ReleaseDC(hwnd, hdc);
         }
-        ReleaseDC(hwnd, hdc);
       }
     }
     return TRUE;
@@ -246,7 +292,7 @@ static BOOL CALLBACK EnumWindowsProcFunc(
             ApplyMenuChanges(menuHandle, false, 0);
         }
         DrawMenuBar(hwnd);
-        RedrawWindow(hwnd, nullptr, 0, RDW_INVALIDATE | RDW_FRAME | RDW_UPDATENOW);
+        RedrawWindow(hwnd, nullptr, 0, RDW_INVALIDATE | RDW_FRAME);
         //RedrawWindow(hwnd, nullptr, 0, RDW_ERASE);
       }
 		}

@@ -557,7 +557,17 @@ Gdiplus::Brush* ThemeDef::GetBGBrushGDIP()
 
 ThemeDef::ThemeDef(const wchar_t* jsonData)
   : isValid(false), bgBrush(0), bgBrushp(nullptr)
+  , useSelectedStateForHoverTop(true), useSelectedStateForHoverItem(false)
 {
+  std::wstring topBarBackground = QueryStringSetting(L"menu_color_menu_bar_background_theme_element", L"tab_control");
+  std::wstring topBarElement = QueryStringSetting(L"menu_color_menu_bar_theme_element", L"tab_label");
+
+  std::wstring itemBackground = QueryStringSetting(L"menu_color_menu_item_background_theme_element", L"sidebar_tree");
+  std::wstring itemElement = QueryStringSetting(L"menu_color_menu_item_theme_element", L"sidebar_label");
+
+  useSelectedStateForHoverTop = QueryBoolSetting(L"menu_color_menu_bar_use_selected_state_for_hover", useSelectedStateForHoverTop);
+  useSelectedStateForHoverItem = QueryBoolSetting(L"menu_color_menu_item_use_selected_state_for_hover", useSelectedStateForHoverItem);
+
 	rapidjson::GenericDocument<rapidjson::UTF16<>> doc;
 	rapidjson::ParseResult pr = doc.Parse<rapidjson::kParseCommentsFlag | rapidjson::kParseTrailingCommasFlag>(jsonData);
 
@@ -604,21 +614,23 @@ ThemeDef::ThemeDef(const wchar_t* jsonData)
         continue;
       }
 
-      if (className == L"sidebar_tree" && pass == 0)
+      if (className == itemBackground && pass == 0)
       {
         if (!ReadThemeItem(themeItem, containerElement))
         {
           return;
         }
       }
-      else if (className == L"tab_control" && pass == 0)
+      
+      if (className == topBarBackground && pass == 0)
       {
         if (!ReadThemeItem(themeItem, topContainerElement))
         {
           return;
         }
       }
-      else if (className == L"sidebar_label")
+      
+      if (className == itemElement)
       {
         int elementIndex = 0;
         for (auto& tag : attrTags)
@@ -632,7 +644,7 @@ ThemeDef::ThemeDef(const wchar_t* jsonData)
           else if (tag == L"hover")
             elementIndex |= HOVER;
         }
-        if ((elementIndex & (~pass)) == 0)
+        if ((elementIndex & (~pass)) == 0 || elementIndex == 0)
         {
           if (!ReadThemeItem(themeItem, labelState[pass]))
           {
@@ -640,7 +652,8 @@ ThemeDef::ThemeDef(const wchar_t* jsonData)
           }
         }
       }
-      else if (className == L"tab_label")
+      
+      if (className == topBarElement)
       {
         int elementIndex = 0;
         for (auto& tag : attrTags)
@@ -654,7 +667,7 @@ ThemeDef::ThemeDef(const wchar_t* jsonData)
           else if (tag == L"hover")
             elementIndex |= HOVER;
         }
-        if ((elementIndex & (~pass)) == 0)
+        if ((elementIndex & (~pass)) == 0 || elementIndex == 0)
         {
           if (!ReadThemeItem(themeItem, topLabelState[pass]))
           {
@@ -665,6 +678,8 @@ ThemeDef::ThemeDef(const wchar_t* jsonData)
     }
   }
 
+  bool bumpTopBarTextSize = QueryBoolSetting(L"menu_color_menu_bar_increase_text_size", true);
+
   //Do it now to prevent deadlocks later
   containerElement.ForceLoad(*this);
   topContainerElement.ForceLoad(*this);
@@ -674,7 +689,9 @@ ThemeDef::ThemeDef(const wchar_t* jsonData)
   }
   for (auto& e : topLabelState)
   {
-    e.fontSize++;
+    if (bumpTopBarTextSize)
+      e.fontSize++;
+
     e.ForceLoad(*this);
   }
   GetBGBrush();
@@ -734,13 +751,15 @@ void ThemeDef::DrawItem(HWND hwnd, const LPDRAWITEMSTRUCT diStruct)
 
   int elementIndex = 0;
 
+  bool selectedForHover = isRootMenu ? useSelectedStateForHoverTop : useSelectedStateForHoverItem;
+
   if (diStruct->itemState & ODS_SELECTED)
-    elementIndex |= (isRootMenu ? SELECTED : EXPANDABLE);
+    elementIndex |= (selectedForHover ? SELECTED : HOVER);
   if (diStruct->itemState & ODS_HOTLIGHT)
-    elementIndex |= (isRootMenu ? SELECTED : HOVER);
+    elementIndex |= (selectedForHover ? SELECTED : HOVER);
 
   if (menuItemInfo.fState & MFS_CHECKED)
-    elementIndex |= SELECTED;
+    elementIndex |= EXPANDABLE;
 
 
   Gdiplus::Rect outerRect(diStruct->rcItem.left, diStruct->rcItem.top, diStruct->rcItem.right - diStruct->rcItem.left, diStruct->rcItem.bottom - diStruct->rcItem.top);

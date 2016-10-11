@@ -1,16 +1,20 @@
 #include "stdafx.h"
 #include "SublimeTextMenuColor.h"
 
-typedef bool(*QueryBoolSettingFunc)(const wchar_t* strPtr);
+typedef bool(*QueryBoolSettingFunc)(const wchar_t* strPtr, bool defVal);
+typedef void(*QueryStringSettingFunc)(const wchar_t* strPtr, void** buffPointer, size_t* bufSize);
 typedef void(*QueryBinaryResourceFunc)(const wchar_t* strPtr, void** buffPointer, size_t* bufSize);
 
+
 QueryBoolSettingFunc g_queryBoolSettingsFunc = nullptr;
+QueryStringSettingFunc g_queryStringSettingsFunc = nullptr;
 QueryBinaryResourceFunc g_queryBinaryResourceFunc = nullptr;
 
-PYTHON_CALLABLE void SetCallbacks(PrintFunc func, QueryBoolSettingFunc settingFunc, QueryBinaryResourceFunc resourceFunc)
+PYTHON_CALLABLE void SetCallbacks(PrintFunc func, QueryBoolSettingFunc settingFunc, QueryStringSettingFunc stringSettingFunc, QueryBinaryResourceFunc resourceFunc)
 {
 	g_PrintFunc = func ? func : &DefaultPrintFunc;
   g_queryBoolSettingsFunc = settingFunc;
+  g_queryStringSettingsFunc = stringSettingFunc;
   g_queryBinaryResourceFunc = resourceFunc;
 }
 
@@ -27,14 +31,33 @@ void Impl_PluginHost_PrintString(
 
 boolean Impl_PluginHost_GetBoolSetting(
   /* [string][in] */ const wchar_t *str,
+  /* [in] */ boolean defValue,
   /* [out] */ boolean *outValue)
 {
   if (g_queryBoolSettingsFunc)
   {
-    *outValue = g_queryBoolSettingsFunc(str);
+    *outValue = g_queryBoolSettingsFunc(str, defValue != 0);
     return true;
   }
-  *outValue = false;
+  *outValue = defValue;
+  return false;
+}
+
+boolean Impl_PluginHost_GetStringSetting(
+  /* [string][in] */ const wchar_t *str,
+  /* [out] */ unsigned int *outDataSize,
+  /* [out] */ unsigned char **outData)
+{
+  void* buffer = nullptr;
+  size_t bufferSize = 0;
+  if (g_queryStringSettingsFunc)
+  {
+    g_queryStringSettingsFunc(str, &buffer, &bufferSize);
+    *outDataSize = (unsigned int)bufferSize;
+    *outData = (unsigned char*)buffer;
+    return true;
+  }
+  *outData = nullptr;
   return false;
 }
 
@@ -49,12 +72,7 @@ boolean Impl_PluginHost_GetBinaryResource(
   {
     g_queryBinaryResourceFunc(str, &buffer, &bufferSize);
     *outDataSize = (unsigned int)bufferSize;
-    *outData = (unsigned char*)MIDL_user_allocate(bufferSize);
-    if (buffer)
-    {
-      memcpy(*outData, buffer, bufferSize);
-      HeapFree(GetProcessHeap(), 0, buffer);
-    }
+    *outData = (unsigned char*)buffer;
     return true;
   }
   *outData = nullptr;
@@ -153,7 +171,7 @@ PYTHON_CALLABLE bool UnloadFromMainProcess()
 		return false;
 	}
 
-  SetCallbacks(nullptr, nullptr, nullptr);
+  SetCallbacks(nullptr, nullptr, nullptr, nullptr);
 
   HMODULE moduleHandle;
   GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, (LPCWSTR)&UnloadFromMainProcess, &moduleHandle);

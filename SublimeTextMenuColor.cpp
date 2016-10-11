@@ -66,10 +66,10 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 
 void __RPC_FAR * __RPC_USER midl_user_allocate(size_t cBytes)
 {
-  return((void __RPC_FAR *) _aligned_malloc(cBytes, 8));
+  return((void __RPC_FAR *)HeapAlloc(GetProcessHeap(), 0, cBytes));
 }
 
 void __RPC_USER midl_user_free(void __RPC_FAR * p)
 {
-  _aligned_free(p);
+  HeapFree(GetProcessHeap(), 0, p);
 }

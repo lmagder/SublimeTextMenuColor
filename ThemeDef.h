@@ -111,6 +111,8 @@ class ThemeDef
   HBRUSH bgBrush;
   std::unique_ptr<Gdiplus::Brush> bgBrushp;
   bool isValid;
+  bool useSelectedStateForHoverTop;
+  bool useSelectedStateForHoverItem;
 
 public:
 	ThemeDef(const wchar_t* jsonData);

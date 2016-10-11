@@ -1,0 +1,17 @@
+{
+	//These elements are used to draw the menu based on your theme
+	//Which ones you use depend on the theme, or you could define custom ones if you are writing a theme
+
+	//Re-use the tabs to draw the top bar
+	"menu_color_menu_bar_background_theme_element" : "tab_control",
+	"menu_color_menu_bar_theme_element" : "tab_label",
+
+	//And the sidebar for the submenus
+	"menu_color_menu_item_background_theme_element" : "sidebar_tree",
+	"menu_color_menu_item_theme_element" : "sidebar_label",
+
+	"menu_color_menu_bar_use_selected_state_for_hover": true,
+	"menu_color_menu_item_use_selected_state_for_hover": false,
+
+	"menu_color_menu_bar_increase_text_size": true,
+}

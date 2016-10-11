@@ -9,6 +9,7 @@ interface SublimeProcess
   void SublimeProcess_UpdateTheme([in, string] const wchar_t* str);
 
   [callback] void PluginHost_PrintString([in, string] const wchar_t* str);
-  [callback] boolean PluginHost_GetBoolSetting([in, string] const wchar_t* str, [out] boolean* outValue);
+  [callback] boolean PluginHost_GetBoolSetting([in, string] const wchar_t* str, [in] boolean defValue, [out] boolean* outValue);
+  [callback] boolean PluginHost_GetStringSetting([in, string] const wchar_t* str, [out] unsigned int* outDataSize, [out, size_is(, *outDataSize)] char** outData);
   [callback] boolean PluginHost_GetBinaryResource([in, string] const wchar_t* str, [out] unsigned int* outDataSize, [out, size_is(, *outDataSize)] char** outData);
 };
