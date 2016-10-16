@@ -11,6 +11,8 @@ struct ThemeElement
     MARGINS innerMargins;
     std::wstring texturePath;
     std::shared_ptr<Gdiplus::Bitmap> texture;
+    std::shared_ptr<Gdiplus::Bitmap> texture2x;
+    std::shared_ptr<Gdiplus::Bitmap> texture3x;
     std::unique_ptr<Gdiplus::Brush> tintBrush;
 
     Layer() :tint(255, 255, 255), opacity(0.0f), texture(nullptr), tintBrush(nullptr)
@@ -30,7 +32,6 @@ struct ThemeElement
       }
       return tintBrush.get();
     }
-    Gdiplus::Bitmap* GetTexture();
 
     void ForceLoad(ThemeDef& def);
 
@@ -94,8 +95,6 @@ struct ThemeElement
 
 class ThemeDef
 {
-	ThemeElement containerElement;
-  ThemeElement topContainerElement;
 	enum
 	{
 		SELECTED = 1,
@@ -104,8 +103,10 @@ class ThemeDef
 		EXPANDABLE = 8,
 		STATE_COUNT = 16
 	};
-	std::array<ThemeElement, STATE_COUNT> labelState;
-  std::array<ThemeElement, STATE_COUNT> topLabelState;
+	std::array<std::deque<ThemeElement>, STATE_COUNT> labelState;
+  std::array<std::deque<ThemeElement>, STATE_COUNT> topLabelState;
+
+
   std::unordered_map<std::wstring, bool> settingCache;
   std::unordered_map<std::wstring, std::shared_ptr<Gdiplus::Bitmap>> bitmapCache;
   HBRUSH bgBrush;

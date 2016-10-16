@@ -62,9 +62,18 @@ class DLLInterface(object):
             global PluginSettings
             if Settings is None or PluginSettings is None:
                 return
-            settingStr = str(PluginSettings.get(settingName, Settings.get(settingName, "")))
-            print("{0} -> {1}".format(settingName, settingStr))
-            outBufferPtr[0], outBufSize[0] = allocNativeHeapForArray(settingStr.encode("utf-16-le"))
+            settingStr = PluginSettings.get(settingName, Settings.get(settingName, ""))
+            if isinstance(settingStr, list):
+                buffer = bytearray()
+                for item in settingStr:
+                    itemStr = str(item)
+                    buffer.extend(itemStr.encode("utf-16-le"))
+                    buffer.extend('\0'.encode("utf-16-le"))
+                outBufferPtr[0], outBufSize[0] = allocNativeHeapForArray(buffer)
+            else:
+                settingStr = str(settingStr)
+                outBufferPtr[0], outBufSize[0] = allocNativeHeapForArray(settingStr.encode("utf-16-le") + '\0'.encode("utf-16-le"))
+            
         self.stringSettingCallback = queryStringSettingProto(getStringSetting)
 
         def getResource(resName, outBufferPtr, outBufSize):

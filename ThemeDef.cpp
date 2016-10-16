@@ -532,13 +532,16 @@ HBRUSH ThemeDef::GetBGBrush()
 
   if (!bgBrush)
   {
-    for (auto& l : topContainerElement.layers)
+    for (auto& s : topLabelState[0])
     {
-      if (l.opacity > 0)
+      for (auto& l : s.layers)
       {
-        bgBrush = CreateSolidBrush(l.tint.ToCOLORREF());
-        bgBrushp = std::make_unique<Gdiplus::SolidBrush>(l.tint);
-        break;
+        if (l.opacity > 0)
+        {
+          bgBrush = CreateSolidBrush(l.tint.ToCOLORREF());
+          bgBrushp = std::make_unique<Gdiplus::SolidBrush>(l.tint);
+          return bgBrush;
+        }
       }
     }
   }
@@ -559,11 +562,19 @@ ThemeDef::ThemeDef(const wchar_t* jsonData)
   : isValid(false), bgBrush(0), bgBrushp(nullptr)
   , useSelectedStateForHoverTop(true), useSelectedStateForHoverItem(false)
 {
-  std::wstring topBarBackground = QueryStringSetting(L"menu_color_menu_bar_background_theme_element", L"tab_control");
-  std::wstring topBarElement = QueryStringSetting(L"menu_color_menu_bar_theme_element", L"tab_label");
+  std::vector<std::wstring> topBarElement = QueryStringArraySetting(L"menu_color_menu_bar_theme_elements", { L"tab_control", L"tab_label" });
+  std::vector<std::wstring> itemElement = QueryStringArraySetting(L"menu_color_menu_item_theme_elements", { L"sidebar_tree", L"sidebar_label" });
 
-  std::wstring itemBackground = QueryStringSetting(L"menu_color_menu_item_background_theme_element", L"sidebar_tree");
-  std::wstring itemElement = QueryStringSetting(L"menu_color_menu_item_theme_element", L"sidebar_label");
+  if (topBarElement.size() == 0 || itemElement.size() == 0)
+  {
+    return;
+  }
+
+  for (int pass = 0; pass < STATE_COUNT; pass++)
+  {
+    topLabelState[pass].resize(topBarElement.size());
+    labelState[pass].resize(itemElement.size());
+  }
 
   useSelectedStateForHoverTop = QueryBoolSetting(L"menu_color_menu_bar_use_selected_state_for_hover", useSelectedStateForHoverTop);
   useSelectedStateForHoverItem = QueryBoolSetting(L"menu_color_menu_item_use_selected_state_for_hover", useSelectedStateForHoverItem);
@@ -614,23 +625,11 @@ ThemeDef::ThemeDef(const wchar_t* jsonData)
         continue;
       }
 
-      if (className == itemBackground && pass == 0)
-      {
-        if (!ReadThemeItem(themeItem, containerElement))
-        {
-          return;
-        }
-      }
+      auto topBarElementItr = std::find(topBarElement.begin(), topBarElement.end(), className);
+      auto itemElementItr = std::find(itemElement.begin(), itemElement.end(), className);
+
       
-      if (className == topBarBackground && pass == 0)
-      {
-        if (!ReadThemeItem(themeItem, topContainerElement))
-        {
-          return;
-        }
-      }
-      
-      if (className == itemElement)
+      if (topBarElementItr != topBarElement.end())
       {
         int elementIndex = 0;
         for (auto& tag : attrTags)
@@ -646,14 +645,14 @@ ThemeDef::ThemeDef(const wchar_t* jsonData)
         }
         if ((elementIndex & (~pass)) == 0 || elementIndex == 0)
         {
-          if (!ReadThemeItem(themeItem, labelState[pass]))
+          if (!ReadThemeItem(themeItem, topLabelState[pass][topBarElementItr - topBarElement.begin()]))
           {
             return;
           }
         }
       }
       
-      if (className == topBarElement)
+      if (itemElementItr != itemElement.end())
       {
         int elementIndex = 0;
         for (auto& tag : attrTags)
@@ -669,7 +668,7 @@ ThemeDef::ThemeDef(const wchar_t* jsonData)
         }
         if ((elementIndex & (~pass)) == 0 || elementIndex == 0)
         {
-          if (!ReadThemeItem(themeItem, topLabelState[pass]))
+          if (!ReadThemeItem(themeItem, labelState[pass][itemElementItr - itemElement.begin()]))
           {
             return;
           }
@@ -681,18 +680,23 @@ ThemeDef::ThemeDef(const wchar_t* jsonData)
   bool bumpTopBarTextSize = QueryBoolSetting(L"menu_color_menu_bar_increase_text_size", true);
 
   //Do it now to prevent deadlocks later
-  containerElement.ForceLoad(*this);
-  topContainerElement.ForceLoad(*this);
   for (auto& e : labelState)
   {
-    e.ForceLoad(*this);
+    for (auto& e2 : e)
+    {
+      e2.ForceLoad(*this);
+    }
   }
   for (auto& e : topLabelState)
   {
-    if (bumpTopBarTextSize)
-      e.fontSize++;
+    for (auto& e2 : e)
+    {
+      if (bumpTopBarTextSize)
+        e2.fontSize++;
 
-    e.ForceLoad(*this);
+      e2.ForceLoad(*this);
+
+    }
   }
   GetBGBrush();
   isValid = true;
@@ -731,7 +735,6 @@ void ThemeDef::DrawItem(HWND hwnd, const LPDRAWITEMSTRUCT diStruct)
   HMENU hmenu = GetMenu(hwnd);
   bool isRootMenu = IsRootMenuItem(hmenu, diStruct->itemID);
 
-
   MENUITEMINFOW menuItemInfo;
   memset(&menuItemInfo, 0, sizeof(menuItemInfo));
   menuItemInfo.cbSize = sizeof(menuItemInfo);
@@ -764,56 +767,63 @@ void ThemeDef::DrawItem(HWND hwnd, const LPDRAWITEMSTRUCT diStruct)
 
   Gdiplus::Rect outerRect(diStruct->rcItem.left, diStruct->rcItem.top, diStruct->rcItem.right - diStruct->rcItem.left, diStruct->rcItem.bottom - diStruct->rcItem.top);
   //outerRect.Inflate(1, 1);
-  auto& state = isRootMenu ? topLabelState[elementIndex] : labelState[elementIndex];
-  auto& container = isRootMenu ? topContainerElement : containerElement;
+  auto& stateStack = isRootMenu ? topLabelState[elementIndex] : labelState[elementIndex];
 
-  container.DrawLayers(graphics, outerRect, false);
- 
-  state.DrawLayers(graphics, outerRect, false);
-  
-  Gdiplus::PointF textOrigin(
-    diStruct->rcItem.left + state.contentMargins.cxLeftWidth + state.rowPadding.X + container.rowPadding.X,
-    diStruct->rcItem.top + state.contentMargins.cyTopHeight + state.rowPadding.Y + container.rowPadding.Y
-  );
-
-  Gdiplus::PointF textEnd(
-    diStruct->rcItem.right - state.contentMargins.cxRightWidth - state.rowPadding.X - container.rowPadding.X,
-    diStruct->rcItem.bottom - state.contentMargins.cyBottomHeight - state.rowPadding.Y - container.rowPadding.Y
-  );
-
-  if (isRootMenu)
+  Gdiplus::PointF rowPadding(0, 0);
+  for (size_t i = 0; i < stateStack.size(); i++)
   {
-    textOrigin = Gdiplus::PointF((float)diStruct->rcItem.left, (float)diStruct->rcItem.top);
-    textEnd = Gdiplus::PointF((float)diStruct->rcItem.right, (float)diStruct->rcItem.bottom);
-  }
+    auto& state = stateStack[i];
+    state.DrawLayers(graphics, outerRect, false);
+    rowPadding = rowPadding + state.rowPadding;
+    if (i < (stateStack.size() - 1))
+    {
+      continue;
+    }
 
-  Gdiplus::RectF textRect(textOrigin, Gdiplus::SizeF(textEnd.X - textOrigin.X, textEnd.Y - textOrigin.Y));
+    Gdiplus::PointF textOrigin(
+      diStruct->rcItem.left + state.contentMargins.cxLeftWidth + rowPadding.X,
+      diStruct->rcItem.top + state.contentMargins.cyTopHeight + rowPadding.Y
+    );
 
-  Gdiplus::StringFormat format;
-  format.SetHotkeyPrefix((diStruct->itemState & ODS_NOACCEL) ? Gdiplus::HotkeyPrefixHide : Gdiplus::HotkeyPrefixShow);
+    Gdiplus::PointF textEnd(
+      diStruct->rcItem.right - state.contentMargins.cxRightWidth - rowPadding.X,
+      diStruct->rcItem.bottom - state.contentMargins.cyBottomHeight - rowPadding.Y
+    );
 
-  Gdiplus::RectF shadowRect = textRect;
-  shadowRect.Offset(state.shadowOffset);
-
-  auto tabIndex = labelText.find(L'\t');
-  if (tabIndex == std::wstring::npos)
-  {
     if (isRootMenu)
-      format.SetAlignment(Gdiplus::StringAlignmentCenter);
+    {
+      textOrigin = Gdiplus::PointF((float)diStruct->rcItem.left, (float)diStruct->rcItem.top);
+      textEnd = Gdiplus::PointF((float)diStruct->rcItem.right, (float)diStruct->rcItem.bottom);
+    }
 
-    graphics.DrawString(labelText.c_str(), (int)labelText.size(), state.GetFont(dc), shadowRect, &format, state.GetShadowBrush());
-    graphics.DrawString(labelText.c_str(), (int)labelText.size(), state.GetFont(dc), textRect, &format, state.GetTextBrush());
-  }
-  else
-  {
-    Gdiplus::StringFormat formatRight(&format);
-    formatRight.SetAlignment(Gdiplus::StringAlignmentFar);
+    Gdiplus::RectF textRect(textOrigin, Gdiplus::SizeF(textEnd.X - textOrigin.X, textEnd.Y - textOrigin.Y));
 
-    graphics.DrawString(labelText.c_str(), (int)tabIndex, state.GetFont(dc), shadowRect, &format, state.GetShadowBrush());
-    graphics.DrawString(labelText.c_str() + tabIndex + 1, (int)(labelText.size() - tabIndex), state.GetFont(dc), shadowRect, &formatRight, state.GetShadowBrush());
+    Gdiplus::StringFormat format;
+    format.SetHotkeyPrefix((diStruct->itemState & ODS_NOACCEL) ? Gdiplus::HotkeyPrefixHide : Gdiplus::HotkeyPrefixShow);
 
-    graphics.DrawString(labelText.c_str(), (int)tabIndex, state.GetFont(dc), textRect, &format, state.GetTextBrush());
-    graphics.DrawString(labelText.c_str() + tabIndex + 1, (int)(labelText.size() - tabIndex), state.GetFont(dc), textRect, &formatRight, state.GetTextBrush());
+    Gdiplus::RectF shadowRect = textRect;
+    shadowRect.Offset(state.shadowOffset);
+
+    auto tabIndex = labelText.find(L'\t');
+    if (tabIndex == std::wstring::npos)
+    {
+      if (isRootMenu)
+        format.SetAlignment(Gdiplus::StringAlignmentCenter);
+
+      graphics.DrawString(labelText.c_str(), (int)labelText.size(), state.GetFont(dc), shadowRect, &format, state.GetShadowBrush());
+      graphics.DrawString(labelText.c_str(), (int)labelText.size(), state.GetFont(dc), textRect, &format, state.GetTextBrush());
+    }
+    else
+    {
+      Gdiplus::StringFormat formatRight(&format);
+      formatRight.SetAlignment(Gdiplus::StringAlignmentFar);
+
+      graphics.DrawString(labelText.c_str(), (int)tabIndex, state.GetFont(dc), shadowRect, &format, state.GetShadowBrush());
+      graphics.DrawString(labelText.c_str() + tabIndex + 1, (int)(labelText.size() - tabIndex), state.GetFont(dc), shadowRect, &formatRight, state.GetShadowBrush());
+
+      graphics.DrawString(labelText.c_str(), (int)tabIndex, state.GetFont(dc), textRect, &format, state.GetTextBrush());
+      graphics.DrawString(labelText.c_str() + tabIndex + 1, (int)(labelText.size() - tabIndex), state.GetFont(dc), textRect, &formatRight, state.GetTextBrush());
+    }
   }
 }
 
@@ -841,12 +851,22 @@ void ThemeDef::MeasureItem(HWND hwnd, LPMEASUREITEMSTRUCT miStruct)
     }
 
     bool isRootMenu = IsRootMenuItem(menu, miStruct->itemID);
-    auto& state = isRootMenu ? topLabelState[0] : labelState[0];
-    auto& container = isRootMenu ? topContainerElement : containerElement;
+
+    //outerRect.Inflate(1, 1);
+    auto& stateStack = isRootMenu ? topLabelState[0] : labelState[0];
+
+    Gdiplus::PointF rowPadding(0, 0);
+    for (size_t i = 0; i < stateStack.size(); i++)
+    {
+      auto& state = stateStack[i];
+      rowPadding = rowPadding + state.rowPadding;
+    }
+
+    auto& state = isRootMenu ? topLabelState[0].back() : labelState[0].back();
 
     Gdiplus::PointF textOrigin(
-      state.contentMargins.cxLeftWidth + state.rowPadding.X + container.rowPadding.X,
-      state.contentMargins.cyTopHeight + state.rowPadding.Y + container.rowPadding.Y
+      state.contentMargins.cxLeftWidth + rowPadding.X,
+      state.contentMargins.cyTopHeight + rowPadding.Y
     );
 
     if (isRootMenu)
@@ -869,8 +889,8 @@ void ThemeDef::MeasureItem(HWND hwnd, LPMEASUREITEMSTRUCT miStruct)
     }
     else
     {
-      miStruct->itemWidth = (UINT)(bounds.GetRight() + state.contentMargins.cxRightWidth + state.rowPadding.X + container.rowPadding.X);
-      miStruct->itemHeight = (UINT)(bounds.GetBottom() + state.contentMargins.cyBottomHeight + state.rowPadding.Y + container.rowPadding.Y);
+      miStruct->itemWidth = (UINT)(bounds.GetRight() + state.contentMargins.cxRightWidth + rowPadding.X);
+      miStruct->itemHeight = (UINT)(bounds.GetBottom() + state.contentMargins.cyBottomHeight + rowPadding.Y);
     }
   }
   ReleaseDC(hwnd, dc);
@@ -918,23 +938,37 @@ void ThemeElement::ForceLoad(ThemeDef& def)
   }
 }
 
-Gdiplus::Bitmap* ThemeElement::Layer::GetTexture()
-{
-  return texture.get();
-}
-
 void ThemeElement::Layer::ForceLoad(ThemeDef& def)
 {
   if (texturePath.size() > 0 && !texture)
   {
     texture = def.GetBitmap(texturePath.c_str());
+    auto extPos = texturePath.rfind(L'.');
+    std::wstring hidpiTex2x = texturePath.substr(0, extPos) + L"@2x" + texturePath.substr(extPos);
+    texture2x = def.GetBitmap(hidpiTex2x.c_str());
+    std::wstring hidpiTex3x = texturePath.substr(0, extPos) + L"@3x" + texturePath.substr(extPos);
+    texture3x = def.GetBitmap(hidpiTex3x.c_str());
   }
   GetTintBrush();
 }
 
 void ThemeElement::Layer::DrawLayer(Gdiplus::Graphics& graphics, const Gdiplus::Rect& rect, bool skipImage)
 {
-  Gdiplus::Image* layerImage = GetTexture();
+  Gdiplus::Image* layerImage = texture.get();
+  
+  float dpiScale = graphics.GetDpiY() / 96.0f;
+  int imageSizeFactor = 1;
+  if (dpiScale > 2.0f && texture3x)
+  {
+    layerImage = texture3x.get();
+    imageSizeFactor = 3;
+  }
+  else if (dpiScale > 1.0f && texture2x)
+  {
+    layerImage = texture2x.get();
+    imageSizeFactor = 2;
+  }
+  
   if (layerImage)
   {
     if (!skipImage)
@@ -943,11 +977,11 @@ void ThemeElement::Layer::DrawLayer(Gdiplus::Graphics& graphics, const Gdiplus::
       Gdiplus::Point srcPts[9];
       Gdiplus::Point srcPtsMax[9];
 
-      int ptsAlongX[4] = { 0, innerMargins.cxLeftWidth, imageDims.X - innerMargins.cxRightWidth, imageDims.X };
-      int ptsAlongY[4] = { 0, innerMargins.cyTopHeight, imageDims.Y - innerMargins.cyBottomHeight, imageDims.Y };
+      int ptsAlongX[4] = { 0, innerMargins.cxLeftWidth * imageSizeFactor, imageDims.X - innerMargins.cxRightWidth * imageSizeFactor, imageDims.X };
+      int ptsAlongY[4] = { 0, innerMargins.cyTopHeight * imageSizeFactor, imageDims.Y - innerMargins.cyBottomHeight * imageSizeFactor, imageDims.Y };
 
-      int destPtsAlongX[4] = { rect.GetLeft(), rect.GetLeft() + innerMargins.cxLeftWidth, rect.GetRight() - innerMargins.cxRightWidth, rect.GetRight() };
-      int destPtsAlongY[4] = { rect.GetTop(), rect.GetTop() + innerMargins.cyTopHeight, rect.GetBottom() - innerMargins.cyBottomHeight, rect.GetBottom() };
+      int destPtsAlongX[4] = { rect.GetLeft(), rect.GetLeft() + innerMargins.cxLeftWidth * imageSizeFactor, rect.GetRight() - innerMargins.cxRightWidth * imageSizeFactor, rect.GetRight() };
+      int destPtsAlongY[4] = { rect.GetTop(), rect.GetTop() + innerMargins.cyTopHeight * imageSizeFactor, rect.GetBottom() - innerMargins.cyBottomHeight * imageSizeFactor, rect.GetBottom() };
       for (int i = 1; i < 4; i++)
       {
         if (ptsAlongX[i] < ptsAlongX[i - 1])

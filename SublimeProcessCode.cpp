@@ -67,11 +67,49 @@ std::wstring QueryStringSetting(const wchar_t* setting, const std::wstring& def)
   {
     if (outData)
     {
-      outVal.assign((wchar_t*)outData, (size_t)(outDataSize) / sizeof(wchar_t));
+      outVal.assign((wchar_t*)outData);
       MIDL_user_free(outData);
     }
   }
   if (!outData)
+  {
+    outVal = def;
+  }
+  return outVal;
+}
+
+std::vector<std::wstring> QueryStringArraySetting(const wchar_t* setting, const std::vector<std::wstring>& def /*= std::vector<std::wstring>()*/)
+{
+  std::vector<std::wstring> outVal;
+  unsigned int outDataSize = 0;
+  unsigned char* outData = nullptr;
+  if (WrapPluginHost_GetStringSetting(setting, &outDataSize, &outData))
+  {
+    if (outData && outDataSize > 0)
+    {
+      wchar_t* woutData = (wchar_t*)outData;
+      size_t woutDataSize = (size_t)(outDataSize) / sizeof(wchar_t);
+      //Use nulls
+      while (woutDataSize > 0)
+      {
+        outVal.push_back(woutData);
+        if (outVal.back().length() == 0)
+        {
+          outVal.pop_back();
+        }
+        else
+        {
+          woutData += outVal.back().length();
+          woutDataSize -= outVal.back().length();
+          //for null
+          woutData++;
+          woutDataSize--;
+        }
+      }
+      MIDL_user_free(outData);
+    }
+  }
+  if (!outData || outDataSize == 0)
   {
     outVal = def;
   }
