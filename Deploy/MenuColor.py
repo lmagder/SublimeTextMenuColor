@@ -3,6 +3,7 @@ import sublime_plugin
 import ctypes
 import inspect
 import os
+import struct
 
 DLLInstance = None
 Settings = None
@@ -43,9 +44,10 @@ class DLLInterface(object):
         printCallbackProto = ctypes.CFUNCTYPE(None, ctypes.c_wchar_p)
         queryBoolSettingProto = ctypes.CFUNCTYPE(ctypes.c_bool, ctypes.c_wchar_p, ctypes.c_bool)
         queryStringSettingProto = ctypes.CFUNCTYPE(None, ctypes.c_wchar_p, ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_size_t))
+        queryNumberSettingProto = ctypes.CFUNCTYPE(None, ctypes.c_wchar_p, ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_size_t))
         queryBinaryResourceProto = ctypes.CFUNCTYPE(None, ctypes.c_wchar_p, ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_size_t))
 
-        setCallbacksProto = ctypes.CFUNCTYPE(None, printCallbackProto, queryBoolSettingProto, queryStringSettingProto, queryBinaryResourceProto)
+        setCallbacksProto = ctypes.CFUNCTYPE(None, printCallbackProto, queryBoolSettingProto, queryStringSettingProto, queryNumberSettingProto, queryBinaryResourceProto)
         self.setCallbacks = setCallbacksProto(("SetCallbacks", self.DLLObject))
 
         self.printCallback = printCallbackProto(print)
@@ -76,6 +78,26 @@ class DLLInterface(object):
             
         self.stringSettingCallback = queryStringSettingProto(getStringSetting)
 
+        def getNumberSetting(settingName, outArrayPtr, outArraySize):
+            global Settings
+            global PluginSettings
+            if Settings is None or PluginSettings is None:
+                return
+            settingStr = PluginSettings.get(settingName, Settings.get(settingName, 0.0))
+            buffer = bytearray()
+            outArraySize[0] = 0
+            if isinstance(settingStr, list):
+                for item in settingStr:
+                    buffer.extend(struct.pack("d", item))
+                outArraySize[0] = len(settingStr)
+            else:
+                buffer.extend(struct.pack("d", settingStr))
+                outArraySize[0] = 1
+            outBufferPtr, outBufSize = allocNativeHeapForArray(buffer)
+            outArrayPtr[0] = outBufferPtr
+            
+        self.numberSettingCallback = queryNumberSettingProto(getNumberSetting)
+
         def getResource(resName, outBufferPtr, outBufSize):
             #print("Loading {0}".format(resName))
             resData = None
@@ -87,7 +109,7 @@ class DLLInterface(object):
 
         self.resoureCallback = queryBinaryResourceProto(getResource)
 
-        self.setCallbacks(self.printCallback, self.boolSettingCallback, self.stringSettingCallback, self.resoureCallback)
+        self.setCallbacks(self.printCallback, self.boolSettingCallback, self.stringSettingCallback, self.numberSettingCallback, self.resoureCallback)
 
         findTopLevelWindowsProto = ctypes.CFUNCTYPE(ctypes.c_bool)
         self.findTopLevelWindows = findTopLevelWindowsProto(("FindTopLevelWindows", self.DLLObject),())

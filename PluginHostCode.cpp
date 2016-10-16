@@ -3,18 +3,21 @@
 
 typedef bool(*QueryBoolSettingFunc)(const wchar_t* strPtr, bool defVal);
 typedef void(*QueryStringSettingFunc)(const wchar_t* strPtr, void** buffPointer, size_t* bufSize);
+typedef void(*QueryNumberSettingFunc)(const wchar_t* strPtr, double** arrayPtr, size_t* arraySize);
 typedef void(*QueryBinaryResourceFunc)(const wchar_t* strPtr, void** buffPointer, size_t* bufSize);
 
 
 QueryBoolSettingFunc g_queryBoolSettingsFunc = nullptr;
 QueryStringSettingFunc g_queryStringSettingsFunc = nullptr;
+QueryNumberSettingFunc g_queryNumberSettingsFunc = nullptr;
 QueryBinaryResourceFunc g_queryBinaryResourceFunc = nullptr;
 
-PYTHON_CALLABLE void SetCallbacks(PrintFunc func, QueryBoolSettingFunc settingFunc, QueryStringSettingFunc stringSettingFunc, QueryBinaryResourceFunc resourceFunc)
+PYTHON_CALLABLE void SetCallbacks(PrintFunc func, QueryBoolSettingFunc settingFunc, QueryStringSettingFunc stringSettingFunc, QueryNumberSettingFunc numberSettingsFunc, QueryBinaryResourceFunc resourceFunc)
 {
 	g_PrintFunc = func ? func : &DefaultPrintFunc;
   g_queryBoolSettingsFunc = settingFunc;
   g_queryStringSettingsFunc = stringSettingFunc;
+  g_queryNumberSettingsFunc = numberSettingsFunc;
   g_queryBinaryResourceFunc = resourceFunc;
 }
 
@@ -58,6 +61,24 @@ boolean Impl_PluginHost_GetStringSetting(
     return true;
   }
   *outData = nullptr;
+  return false;
+}
+
+boolean Impl_PluginHost_GetNumberSetting(
+  /* [string][in] */ const wchar_t *str,
+  /* [out] */ unsigned int *outArraySize,
+  /* [out] */ double **outArray)
+{
+  double* array = nullptr;
+  size_t arraySize = 0;
+  if (g_queryNumberSettingsFunc)
+  {
+    g_queryNumberSettingsFunc(str, &array, &arraySize);
+    *outArraySize = (unsigned int)arraySize;
+    *outArray = array;
+    return true;
+  }
+  *outArray = nullptr;
   return false;
 }
 
@@ -171,7 +192,7 @@ PYTHON_CALLABLE bool UnloadFromMainProcess()
 		return false;
 	}
 
-  SetCallbacks(nullptr, nullptr, nullptr, nullptr);
+  SetCallbacks(nullptr, nullptr, nullptr, nullptr, nullptr);
 
   HMODULE moduleHandle;
   GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, (LPCWSTR)&UnloadFromMainProcess, &moduleHandle);

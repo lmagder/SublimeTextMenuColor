@@ -116,6 +116,65 @@ std::vector<std::wstring> QueryStringArraySetting(const wchar_t* setting, const 
   return outVal;
 }
 
+static bool WrapPluginHost_GetNumberSetting(
+  /* [string][in] */ const wchar_t *str,
+  /* [out] */ unsigned int *outDataSize,
+  /* [size_is][size_is][out] */ double **outData)
+{
+  RpcTryExcept
+  {
+    if (PluginHost_GetNumberSetting(str, outDataSize, outData))
+    {
+      return true;
+    }
+  }
+    RpcExcept(1)
+  {
+
+  }
+  RpcEndExcept
+  *outData = nullptr;
+  *outDataSize = 0;
+  return false;
+}
+
+double QueryNumberSetting(const wchar_t* setting, double def /*= 0.0*/)
+{
+  unsigned int outDataSize = 0;
+  double* outData = nullptr;
+  if (WrapPluginHost_GetNumberSetting(setting, &outDataSize, &outData))
+  {
+    if (outData && outDataSize >= 1)
+    {
+      def = outData[0];
+    }
+    if (outData)
+    {
+      MIDL_user_free(outData);
+    }
+  }
+  return def;
+}
+
+std::vector<double> QueryNumberArraySetting(const wchar_t* setting, const std::vector<double>& def /*= std::vector<double>()*/)
+{
+  unsigned int outDataSize = 0;
+  double* outData = nullptr;
+  std::vector<double> ret = def;
+  if (WrapPluginHost_GetNumberSetting(setting, &outDataSize, &outData))
+  {
+    if (outData && outDataSize >= 1)
+    {
+      ret = std::vector<double>(outData, outData + outDataSize);
+    }
+    if (outData)
+    {
+      MIDL_user_free(outData);
+    }
+  }
+  return ret;
+}
+
 bool QueryBinaryResource(
   /* [string][in] */ const wchar_t *str,
   /* [out] */ unsigned int *outDataSize,

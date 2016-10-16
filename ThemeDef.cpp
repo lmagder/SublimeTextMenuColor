@@ -698,6 +698,15 @@ ThemeDef::ThemeDef(const wchar_t* jsonData)
 
     }
   }
+
+  auto bgColorOverride = QueryNumberArraySetting(L"menu_color_menu_bar_bg_color_override");
+  if (bgColorOverride.size() >= 3)
+  {
+    Gdiplus::Color bgOverride((BYTE)bgColorOverride[0], (BYTE)bgColorOverride[1], (BYTE)bgColorOverride[2]);
+    bgBrush = CreateSolidBrush(bgOverride.ToCOLORREF());
+    bgBrushp = std::make_unique<Gdiplus::SolidBrush>(bgOverride);
+  }
+
   GetBGBrush();
   isValid = true;
 }
