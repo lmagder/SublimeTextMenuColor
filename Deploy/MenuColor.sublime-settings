@@ -8,6 +8,8 @@
 	//And the sidebar for the submenus
 	"menu_color_menu_item_theme_elements" : ["sidebar_tree", "sidebar_label"],
 
+	"menu_color_disabled_color_mult": [0.45, 0.45, 0.45],
+
 	"menu_color_menu_bar_use_selected_state_for_hover": true,
 	"menu_color_menu_item_use_selected_state_for_hover": false,
 

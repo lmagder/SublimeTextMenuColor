@@ -177,8 +177,15 @@ namespace
     }
   }
 
+  static double GammaMult(double v, double m)
+  {
+    double linearCol = pow(v / 255.0, 2.2);
+    linearCol *= m;
+    return pow(linearCol, 1.0 / 2.2) * 255.0;
+  }
+
   template <typename T>
-  bool ReadThemeItem(const T& themeItem, ThemeElement& dest)
+  bool ReadThemeItem(const T& themeItem, ThemeElement& dest, std::array<double,3>& disabledTint)
   {
     auto themeItemObj = themeItem.GetObject();
 #if 0
@@ -280,6 +287,14 @@ namespace
           arrayValue.Size() > 3 ? (int)arrayValue[3].GetFloat() : 255
         };
         dest.textColor = Gdiplus::Color(rgb[3], rgb[0], rgb[1], rgb[2]);
+
+        int rgbd[4] = {
+          arrayValue.Size() > 0 ? (int)GammaMult(arrayValue[0].GetFloat() , disabledTint[0]) : 0,
+          arrayValue.Size() > 1 ? (int)GammaMult(arrayValue[1].GetFloat() , disabledTint[1]) : 0,
+          arrayValue.Size() > 2 ? (int)GammaMult(arrayValue[2].GetFloat() , disabledTint[2]) : 0,
+          arrayValue.Size() > 3 ? (int)arrayValue[3].GetFloat() : 255
+        };
+        dest.textColorDisabled = Gdiplus::Color(rgbd[3], rgbd[0], rgbd[1], rgbd[2]);
       }
     }
 
@@ -558,6 +573,25 @@ Gdiplus::Brush* ThemeDef::GetBGBrushGDIP()
   return bgBrushp.get();
 }
 
+static int IndexFromTags(const std::vector<std::wstring>& attrTags)
+{
+  int elementIndex = 0;
+  for (auto& tag : attrTags)
+  {
+    if (tag == L"selected")
+      elementIndex |= ThemeDef::SELECTED;
+    else if (tag == L"expandable")
+      elementIndex |= ThemeDef::EXPANDABLE;
+    else if (tag == L"expanded")
+      elementIndex |= ThemeDef::EXPANDED;
+    else if (tag == L"hover")
+      elementIndex |= ThemeDef::HOVER;
+    else if (tag == L"transient")
+      elementIndex |= ThemeDef::TRANSIENT;
+  }
+  return elementIndex;
+}
+
 ThemeDef::ThemeDef(const wchar_t* jsonData)
   : isValid(false), bgBrush(0), bgBrushp(nullptr)
   , useSelectedStateForHoverTop(true), useSelectedStateForHoverItem(false)
@@ -578,6 +612,17 @@ ThemeDef::ThemeDef(const wchar_t* jsonData)
 
   useSelectedStateForHoverTop = QueryBoolSetting(L"menu_color_menu_bar_use_selected_state_for_hover", useSelectedStateForHoverTop);
   useSelectedStateForHoverItem = QueryBoolSetting(L"menu_color_menu_item_use_selected_state_for_hover", useSelectedStateForHoverItem);
+
+  auto disabledColorMultSetting = QueryNumberArraySetting(L"menu_color_disabled_color_mult");
+  if (disabledColorMultSetting.size() >= 3)
+  {
+    std::copy_n(disabledColorMultSetting.begin(), 3, disabledColorMult.begin());
+  }
+  else
+  {
+    std::fill_n(disabledColorMult.begin(), 3, 0.45);
+  }
+
 
 	rapidjson::GenericDocument<rapidjson::UTF16<>> doc;
 	rapidjson::ParseResult pr = doc.Parse<rapidjson::kParseCommentsFlag | rapidjson::kParseTrailingCommasFlag>(jsonData);
@@ -619,11 +664,11 @@ ThemeDef::ThemeDef(const wchar_t* jsonData)
         attrTags = ArrayToVector<std::wstring>(attrAttr->value);
       std::sort(attrTags.begin(), attrTags.end());
 
-      if (std::find(attrTags.begin(), attrTags.end(), L"transient") != attrTags.end())
-      {
-        //skip these
-        continue;
-      }
+      //if (std::find(attrTags.begin(), attrTags.end(), L"transient") != attrTags.end())
+      //{
+      //  //skip these
+      //  continue;
+      //}
 
       auto topBarElementItr = std::find(topBarElement.begin(), topBarElement.end(), className);
       auto itemElementItr = std::find(itemElement.begin(), itemElement.end(), className);
@@ -631,21 +676,11 @@ ThemeDef::ThemeDef(const wchar_t* jsonData)
       
       if (topBarElementItr != topBarElement.end())
       {
-        int elementIndex = 0;
-        for (auto& tag : attrTags)
+        int elementIndex = IndexFromTags(attrTags);
+        //if ((elementIndex & (~pass)) == 0 || elementIndex == 0)
+        if (elementIndex == pass || elementIndex == 0)
         {
-          if (tag == L"selected")
-            elementIndex |= SELECTED;
-          else if (tag == L"expandable")
-            elementIndex |= EXPANDABLE;
-          else if (tag == L"expanded")
-            elementIndex |= EXPANDED;
-          else if (tag == L"hover")
-            elementIndex |= HOVER;
-        }
-        if ((elementIndex & (~pass)) == 0 || elementIndex == 0)
-        {
-          if (!ReadThemeItem(themeItem, topLabelState[pass][topBarElementItr - topBarElement.begin()]))
+          if (!ReadThemeItem(themeItem, topLabelState[pass][topBarElementItr - topBarElement.begin()], disabledColorMult))
           {
             return;
           }
@@ -654,21 +689,11 @@ ThemeDef::ThemeDef(const wchar_t* jsonData)
       
       if (itemElementItr != itemElement.end())
       {
-        int elementIndex = 0;
-        for (auto& tag : attrTags)
+        int elementIndex = IndexFromTags(attrTags);
+        //if ((elementIndex & (~pass)) == 0 || elementIndex == 0)
+        if (elementIndex == pass || elementIndex == 0)
         {
-          if (tag == L"selected")
-            elementIndex |= SELECTED;
-          else if (tag == L"expandable")
-            elementIndex |= EXPANDABLE;
-          else if (tag == L"expanded")
-            elementIndex |= EXPANDED;
-          else if (tag == L"hover")
-            elementIndex |= HOVER;
-        }
-        if ((elementIndex & (~pass)) == 0 || elementIndex == 0)
-        {
-          if (!ReadThemeItem(themeItem, labelState[pass][itemElementItr - itemElement.begin()]))
+          if (!ReadThemeItem(themeItem, labelState[pass][itemElementItr - itemElement.begin()], disabledColorMult))
           {
             return;
           }
@@ -707,6 +732,7 @@ ThemeDef::ThemeDef(const wchar_t* jsonData)
     bgBrushp = std::make_unique<Gdiplus::SolidBrush>(bgOverride);
   }
 
+ 
   GetBGBrush();
   isValid = true;
 }
@@ -765,14 +791,19 @@ void ThemeDef::DrawItem(HWND hwnd, const LPDRAWITEMSTRUCT diStruct)
 
   bool selectedForHover = isRootMenu ? useSelectedStateForHoverTop : useSelectedStateForHoverItem;
 
-  if (diStruct->itemState & ODS_SELECTED)
-    elementIndex |= (selectedForHover ? SELECTED : HOVER);
-  if (diStruct->itemState & ODS_HOTLIGHT)
-    elementIndex |= (selectedForHover ? SELECTED : HOVER);
-
   if (menuItemInfo.fState & MFS_CHECKED)
     elementIndex |= EXPANDABLE;
 
+  bool disabled = ((diStruct->itemState & ODS_DISABLED) | (diStruct->itemState & ODS_GRAYED)) != 0;
+  bool isSeparator = (menuItemInfo.fType & MFT_SEPARATOR) != 0;
+
+  if (!disabled && !isSeparator)
+  {
+    if (diStruct->itemState & ODS_SELECTED)
+      elementIndex |= SELECTED;
+    if (diStruct->itemState & ODS_HOTLIGHT)
+      elementIndex |= (selectedForHover ? SELECTED : HOVER);
+  }
 
   Gdiplus::Rect outerRect(diStruct->rcItem.left, diStruct->rcItem.top, diStruct->rcItem.right - diStruct->rcItem.left, diStruct->rcItem.bottom - diStruct->rcItem.top);
   //outerRect.Inflate(1, 1);
@@ -813,25 +844,37 @@ void ThemeDef::DrawItem(HWND hwnd, const LPDRAWITEMSTRUCT diStruct)
     Gdiplus::RectF shadowRect = textRect;
     shadowRect.Offset(state.shadowOffset);
 
-    auto tabIndex = labelText.find(L'\t');
-    if (tabIndex == std::wstring::npos)
+    if (isSeparator)
     {
-      if (isRootMenu)
-        format.SetAlignment(Gdiplus::StringAlignmentCenter);
-
-      graphics.DrawString(labelText.c_str(), (int)labelText.size(), state.GetFont(dc), shadowRect, &format, state.GetShadowBrush());
-      graphics.DrawString(labelText.c_str(), (int)labelText.size(), state.GetFont(dc), textRect, &format, state.GetTextBrush());
+      if (shadowRect.Height < 1)
+        shadowRect.Height = 1;
+      if (textRect.Height < 1)
+        textRect.Height = 1;
+      graphics.FillRectangle(state.GetShadowBrush(), shadowRect);
+      graphics.FillRectangle(state.GetTextBrush(disabled), textRect);
     }
     else
     {
-      Gdiplus::StringFormat formatRight(&format);
-      formatRight.SetAlignment(Gdiplus::StringAlignmentFar);
+      auto tabIndex = labelText.find(L'\t');
+      if (tabIndex == std::wstring::npos)
+      {
+        if (isRootMenu)
+          format.SetAlignment(Gdiplus::StringAlignmentCenter);
 
-      graphics.DrawString(labelText.c_str(), (int)tabIndex, state.GetFont(dc), shadowRect, &format, state.GetShadowBrush());
-      graphics.DrawString(labelText.c_str() + tabIndex + 1, (int)(labelText.size() - tabIndex), state.GetFont(dc), shadowRect, &formatRight, state.GetShadowBrush());
+        graphics.DrawString(labelText.c_str(), (int)labelText.size(), state.GetFont(dc), shadowRect, &format, state.GetShadowBrush());
+        graphics.DrawString(labelText.c_str(), (int)labelText.size(), state.GetFont(dc), textRect, &format, state.GetTextBrush(disabled));
+      }
+      else
+      {
+        Gdiplus::StringFormat formatRight(&format);
+        formatRight.SetAlignment(Gdiplus::StringAlignmentFar);
 
-      graphics.DrawString(labelText.c_str(), (int)tabIndex, state.GetFont(dc), textRect, &format, state.GetTextBrush());
-      graphics.DrawString(labelText.c_str() + tabIndex + 1, (int)(labelText.size() - tabIndex), state.GetFont(dc), textRect, &formatRight, state.GetTextBrush());
+        graphics.DrawString(labelText.c_str(), (int)tabIndex, state.GetFont(dc), shadowRect, &format, state.GetShadowBrush());
+        graphics.DrawString(labelText.c_str() + tabIndex + 1, (int)(labelText.size() - tabIndex), state.GetFont(dc), shadowRect, &formatRight, state.GetShadowBrush());
+
+        graphics.DrawString(labelText.c_str(), (int)tabIndex, state.GetFont(dc), textRect, &format, state.GetTextBrush(disabled));
+        graphics.DrawString(labelText.c_str() + tabIndex + 1, (int)(labelText.size() - tabIndex), state.GetFont(dc), textRect, &formatRight, state.GetTextBrush(disabled));
+      }
     }
   }
 }
@@ -859,6 +902,7 @@ void ThemeDef::MeasureItem(HWND hwnd, LPMEASUREITEMSTRUCT miStruct)
       labelText.pop_back();
     }
 
+    bool isSeparator = (menuItemInfo.fType & MFT_SEPARATOR) != 0;
     bool isRootMenu = IsRootMenuItem(menu, miStruct->itemID);
 
     //outerRect.Inflate(1, 1);
@@ -884,22 +928,32 @@ void ThemeDef::MeasureItem(HWND hwnd, LPMEASUREITEMSTRUCT miStruct)
       textOrigin.Y = 0;
     }
 
-    Gdiplus::StringFormat format;
-    format.SetHotkeyPrefix(Gdiplus::HotkeyPrefixShow);
-    Gdiplus::REAL tabs[] = { 50 };
-    format.SetTabStops(0, 1, tabs);
-
-    Gdiplus::RectF bounds;
-    graphics.MeasureString(labelText.c_str(), (int)labelText.size(), state.GetFont(dc), textOrigin, &format, &bounds);
-    if (isRootMenu)
+    if (isSeparator)
     {
-      miStruct->itemWidth = (UINT)(bounds.GetRight());
-      miStruct->itemHeight = (UINT)(bounds.GetBottom());
+      miStruct->itemWidth = (UINT)(textOrigin.X + state.contentMargins.cxRightWidth + rowPadding.X);
+      float dpiScale = graphics.GetDpiY() / 96.0f;
+      miStruct->itemHeight = (UINT)(textOrigin.Y + state.contentMargins.cyBottomHeight + rowPadding.Y + 1.0 * dpiScale);
     }
     else
     {
-      miStruct->itemWidth = (UINT)(bounds.GetRight() + state.contentMargins.cxRightWidth + rowPadding.X);
-      miStruct->itemHeight = (UINT)(bounds.GetBottom() + state.contentMargins.cyBottomHeight + rowPadding.Y);
+      Gdiplus::StringFormat format;
+      format.SetHotkeyPrefix(Gdiplus::HotkeyPrefixShow);
+      Gdiplus::REAL tabs[] = { 50 };
+      format.SetTabStops(0, 1, tabs);
+
+      Gdiplus::RectF bounds;
+      graphics.MeasureString(labelText.c_str(), (int)labelText.size(), state.GetFont(dc), textOrigin, &format, &bounds);
+      if (isRootMenu)
+      {
+        miStruct->itemWidth = (UINT)(bounds.GetRight());
+        miStruct->itemHeight = (UINT)(bounds.GetBottom());
+      }
+      else
+      {
+        miStruct->itemWidth = (UINT)(bounds.GetRight() + state.contentMargins.cxRightWidth + rowPadding.X);
+        miStruct->itemHeight = (UINT)(bounds.GetBottom() + state.contentMargins.cyBottomHeight + rowPadding.Y);
+      }
+
     }
   }
   ReleaseDC(hwnd, dc);
@@ -939,7 +993,7 @@ Gdiplus::Font* ThemeElement::GetFont(HDC dc)
 
 void ThemeElement::ForceLoad(ThemeDef& def)
 {
-  GetTextBrush();
+  GetTextBrush(false);
   GetShadowBrush();
   for (auto& l : layers)
   {

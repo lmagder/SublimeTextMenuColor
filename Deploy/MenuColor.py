@@ -84,6 +84,7 @@ class DLLInterface(object):
             if Settings is None or PluginSettings is None:
                 return
             settingStr = PluginSettings.get(settingName, Settings.get(settingName, 0.0))
+            #print("{0} -> {1}".format(settingName, str(settingStr)))
             buffer = bytearray()
             outArraySize[0] = 0
             if isinstance(settingStr, list):

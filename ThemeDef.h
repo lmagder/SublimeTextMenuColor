@@ -39,6 +39,7 @@ struct ThemeElement
   };
 
 	Gdiplus::Color textColor;
+  Gdiplus::Color textColorDisabled;
   Gdiplus::Color shadowColor;
   Gdiplus::PointF shadowOffset;
   Gdiplus::PointF rowPadding;
@@ -48,7 +49,7 @@ struct ThemeElement
   float fontSize;
   std::wstring fontFace;
   std::unique_ptr<Gdiplus::Font> font;
-  std::unique_ptr<Gdiplus::Brush> textBrush, shadowBrush;
+  std::unique_ptr<Gdiplus::Brush> textBrush, shadowBrush, textBrushDisabled;
 	
 	std::array<Layer,4> layers;
 
@@ -65,13 +66,17 @@ struct ThemeElement
 
   Gdiplus::Font* GetFont(HDC dc);
 
-  Gdiplus::Brush* GetTextBrush()
+  Gdiplus::Brush* GetTextBrush(bool disabled)
   {
     if (!textBrush)
     {
       textBrush = std::make_unique<Gdiplus::SolidBrush>(textColor);
     }
-    return textBrush.get();
+    if (!textBrushDisabled)
+    {
+      textBrushDisabled = std::make_unique<Gdiplus::SolidBrush>(textColorDisabled);
+    }
+    return disabled ? textBrushDisabled.get() : textBrush.get();
   }
 
   Gdiplus::Brush* GetShadowBrush()
@@ -95,14 +100,17 @@ struct ThemeElement
 
 class ThemeDef
 {
+public:
 	enum
 	{
 		SELECTED = 1,
 		HOVER = 2,
 		EXPANDED = 4,
 		EXPANDABLE = 8,
-		STATE_COUNT = 16
+    TRANSIENT = 16,
+		STATE_COUNT = 32
 	};
+private:
 	std::array<std::deque<ThemeElement>, STATE_COUNT> labelState;
   std::array<std::deque<ThemeElement>, STATE_COUNT> topLabelState;
 
@@ -114,6 +122,7 @@ class ThemeDef
   bool isValid;
   bool useSelectedStateForHoverTop;
   bool useSelectedStateForHoverItem;
+  std::array<double, 3> disabledColorMult;
 
 public:
 	ThemeDef(const wchar_t* jsonData);
