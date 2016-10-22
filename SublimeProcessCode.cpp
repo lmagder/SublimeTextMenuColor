@@ -389,7 +389,7 @@ static BOOL CALLBACK EnumWindowsProcFunc(
             ApplyMenuChanges(menuHandle, false, 0);
         }
         DrawMenuBar(hwnd);
-        RedrawWindow(hwnd, nullptr, 0, RDW_INVALIDATE | RDW_FRAME);
+        //RedrawWindow(hwnd, nullptr, 0, RDW_INVALIDATE | RDW_FRAME);
         //RedrawWindow(hwnd, nullptr, 0, RDW_ERASE);
       }
 		}
@@ -415,7 +415,6 @@ static void UnhookAllWindows()
         ApplyMenuChanges(menuHandle, false, 0);
 
         DrawMenuBar(it.first);
-        RedrawWindow(it.first, nullptr, 0, RDW_INVALIDATE | RDW_FRAME | RDW_UPDATENOW);
       }
     }
   }
