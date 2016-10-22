@@ -7,7 +7,6 @@ struct ThemeElement
   struct Layer
   {
     Gdiplus::Color tint;
-    float opacity;
     MARGINS innerMargins;
     std::wstring texturePath;
     std::shared_ptr<Gdiplus::Bitmap> texture;
@@ -15,7 +14,7 @@ struct ThemeElement
     std::shared_ptr<Gdiplus::Bitmap> texture3x;
     std::unique_ptr<Gdiplus::Brush> tintBrush;
 
-    Layer() :tint(255, 255, 255), opacity(0.0f), texture(nullptr), tintBrush(nullptr)
+    Layer() :tint(0, 255, 255, 255), texture(nullptr), tintBrush(nullptr)
     {
       memset(&innerMargins, 0, sizeof(innerMargins));
     }
@@ -28,7 +27,7 @@ struct ThemeElement
     {
       if (!tintBrush)
       {
-        tintBrush = std::make_unique<Gdiplus::SolidBrush>(Gdiplus::Color((BYTE)(opacity * 255.0f), tint.GetR(), tint.GetG(), tint.GetB()));
+        tintBrush = std::make_unique<Gdiplus::SolidBrush>(tint);
       }
       return tintBrush.get();
     }

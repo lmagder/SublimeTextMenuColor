@@ -249,7 +249,7 @@ LRESULT CALLBACK WindowProcFunc(
 		return ret;
 	}
 
-  if (uMsg == WM_NCPAINT || uMsg == WM_PAINT || uMsg == WM_ACTIVATE)
+  if (uMsg == WM_NCPAINT || uMsg == WM_ACTIVATE)
   {
     LRESULT ret = CallBaseProc(hwnd, uMsg, wParam, lParam);
     {
@@ -439,7 +439,7 @@ void Impl_SublimeProcess_FindNewWindows(/* [in] */ handle_t IDL_handle)
 
 void Impl_SublimeProcess_UpdateTheme(/* [in] */ handle_t IDL_handle, /* [string][in] */ const wchar_t *str)
 {
-  UnhookAllWindows();
+  bool newIsValid = false;
   std::unique_ptr<ThemeDef> newDef = std::make_unique<ThemeDef>(str);
   {
     std::lock_guard<std::recursive_mutex> lock(g_themeDefCS);
@@ -447,8 +447,18 @@ void Impl_SublimeProcess_UpdateTheme(/* [in] */ handle_t IDL_handle, /* [string]
       g_themeDef = std::move(newDef);
     else
       g_themeDef.reset();
+
+    newIsValid = g_themeDef != nullptr;
   }
-  HandleFindNewWindows();
+
+  if (newIsValid)
+  {
+    HandleFindNewWindows();
+  }
+  else
+  {
+    UnhookAllWindows();
+  }
 }
 
 void MainThreadInSublimeProcess(void* voidArgs)

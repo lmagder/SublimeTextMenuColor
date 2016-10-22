@@ -426,16 +426,17 @@ namespace
             arrayValue.Size() > 1 ? (int)arrayValue[1].GetFloat() : 0,
             arrayValue.Size() > 2 ? (int)arrayValue[2].GetFloat() : 0
           };
-          newLayer.tint = Gdiplus::Color(255, rgb[0], rgb[1], rgb[2]);
+          newLayer.tint = Gdiplus::Color(newLayer.tint.GetA(), rgb[0], rgb[1], rgb[2]);
         }
       }
 
       member = themeItemObj.FindMember(LayeredMember(layer, L"opacity"));
       if (member != themeItemObj.end())
       {
+        float opacity = 0.0f;
         if (member->value.IsNumber())
         {
-          newLayer.opacity = member->value.GetFloat();
+          opacity = member->value.GetFloat();
         }
         else if (member->value.IsObject())
         {
@@ -443,7 +444,7 @@ namespace
           auto targetAttr = member->value.GetObject().FindMember(L"target");
           if (targetAttr != member->value.GetObject().end() && targetAttr->value.IsNumber())
           {
-            newLayer.opacity = targetAttr->value.GetFloat();
+            opacity = targetAttr->value.GetFloat();
           }
           else
           {
@@ -454,7 +455,7 @@ namespace
         {
           g_PrintFunc(L"Can't understand opacity");
         }
-        
+        newLayer.tint = Gdiplus::Color((BYTE)(opacity * 255.0f), newLayer.tint.GetR(), newLayer.tint.GetG(), newLayer.tint.GetB());
       }
 
       member = themeItemObj.FindMember(LayeredMember(layer, L"inner_margin"));
@@ -551,7 +552,7 @@ HBRUSH ThemeDef::GetBGBrush()
     {
       for (auto& l : s.layers)
       {
-        if (l.opacity > 0)
+        if (l.tint.GetA() > 0)
         {
           bgBrush = CreateSolidBrush(l.tint.ToCOLORREF());
           bgBrushp = std::make_unique<Gdiplus::SolidBrush>(l.tint);
@@ -1017,6 +1018,11 @@ void ThemeElement::Layer::ForceLoad(ThemeDef& def)
 
 void ThemeElement::Layer::DrawLayer(Gdiplus::Graphics& graphics, const Gdiplus::Rect& rect, bool skipImage)
 {
+  if (tint.GetA() <= 0)
+  {
+    return;
+  }
+
   Gdiplus::Image* layerImage = texture.get();
   
   float dpiScale = graphics.GetDpiY() / 96.0f;
@@ -1083,7 +1089,7 @@ void ThemeElement::Layer::DrawLayer(Gdiplus::Graphics& graphics, const Gdiplus::
       }
     }
   }
-  else if (opacity > 0)
+  else
   {
     graphics.FillRectangle(GetTintBrush(), rect);
   }
